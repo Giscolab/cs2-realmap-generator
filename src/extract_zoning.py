@@ -257,6 +257,83 @@ def extract_path_tags(tags: dict) -> dict:
     }
 
 
+def parse_osm_bool(value) -> bool:
+    if value is None:
+        return False
+
+    text = str(value).strip().lower()
+    return text in {"yes", "true", "1"}
+
+
+def parse_road_lanes(value) -> int | None:
+    if value is None:
+        return None
+
+    text = str(value).strip().replace(",", ".")
+
+    if not text:
+        return None
+
+    first_value = re.split(r"[;|/]", text)[0].strip()
+
+    try:
+        parsed = int(float(first_value))
+    except (TypeError, ValueError):
+        return None
+
+    return parsed if parsed > 0 else None
+
+
+def infer_road_lanes(highway: str, subcategory: str) -> int:
+    highway = str(highway or "").strip().lower()
+    subcategory = str(subcategory or "").strip().lower()
+
+    if highway in {"motorway", "trunk"}:
+        return 4
+
+    if highway in {"primary", "secondary", "tertiary"}:
+        return 2
+
+    if highway.endswith("_link") or subcategory == "highway ramp":
+        return 1
+
+    if highway in {"residential", "unclassified", "living_street", "road"}:
+        return 2
+
+    if highway == "service":
+        return 1
+
+    return 1
+
+
+def build_road_import_metadata(tags: dict, classification: dict) -> dict:
+    highway = str(tags.get("highway") or "").strip().lower()
+    subcategory = classification.get("subcategory", "Unknown Road")
+    explicit_lanes = parse_road_lanes(tags.get("lanes"))
+    target_lanes = explicit_lanes or infer_road_lanes(highway, subcategory)
+    oneway = parse_osm_bool(tags.get("oneway")) or highway == "motorway" or subcategory == "Highway Ramp"
+    is_roundabout = str(tags.get("junction") or "").strip().lower() == "roundabout"
+
+    return {
+        "schema": "road-import-v1",
+        "highway": highway,
+        "subcategory": subcategory,
+        "targetLaneCount": target_lanes,
+        "explicitLaneCount": explicit_lanes,
+        "inferredLaneCount": explicit_lanes is None,
+        "oneway": oneway,
+        "roundabout": is_roundabout,
+        "bridge": parse_osm_bool(tags.get("bridge")),
+        "tunnel": parse_osm_bool(tags.get("tunnel")),
+        "maxspeed": tags.get("maxspeed"),
+        "surface": tags.get("surface"),
+        "prefabHint": {
+            "category": subcategory,
+            "lanes": target_lanes,
+            "oneway": oneway,
+        },
+    }
+
 def parse_building_levels(value) -> int:
     if value is None:
         return 0
@@ -825,6 +902,7 @@ def main():
             continue
 
         classification = classify_road(tags)
+        road_tags = extract_road_tags(tags)
 
         output["roads"].append({
             "id": el.get("id"),
@@ -834,7 +912,8 @@ def main():
             "sourceTag": classification["sourceTag"],
             "confidence": classification["confidence"],
             "coords": coords,
-            "tags": extract_road_tags(tags),
+            "tags": road_tags,
+            "roadImport": build_road_import_metadata(road_tags, classification),
         })
 
     for el in raw["paths"]:
@@ -956,3 +1035,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

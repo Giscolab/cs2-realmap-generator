@@ -469,7 +469,14 @@
       "  --heightmap-size-km " + quoteArg(heightmapKm) + " `",
       "  --pixels " + quoteArg(HEIGHTMAP_PIXELS),
       "",
-      "tree $bundle /F"
+      "$timelineBundles = " + quoteArg("$env:USERPROFILE\\AppData\\LocalLow\\Colossal Order\\Cities Skylines II\\Mods\\CityTimelineMod\\data\\exports\\bundles"),
+"",
+"New-Item -ItemType Directory -Force $timelineBundles | Out-Null",
+"Copy-Item " + quoteArg(".\\exports\\bundles\\bundle_index.json") + " " + quoteArg("$timelineBundles\\bundle_index.json") + " -Force",
+"Copy-Item $bundle " + quoteArg("$timelineBundles\\$bundleId") + " -Recurse -Force",
+"Write-Host " + quoteArg("Bundle synchronisé vers TimelineMod :") + " $bundleId -ForegroundColor Green",
+"",
+"tree $bundle /F"
     ].join("\n");
   }
   function buildTimelineManifest(cityName, state, command, bundleMeta) {
@@ -1512,3 +1519,4 @@
     create: create
   };
 })(window.CS2Zoning = window.CS2Zoning || {});
+
