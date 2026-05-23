@@ -65,6 +65,10 @@
               Charger le bundle sélectionné
             </button>
 
+            <button id="load-target-bundle" type="button" disabled>
+              Charger le bundle cible
+            </button>
+
             <button id="refresh-bundle-catalog" type="button">
               Actualiser catalogue
             </button>
@@ -76,6 +80,10 @@
 
           <p id="displayed-bundle-status">
             Pack affiché actuellement : aucun
+          </p>
+
+          <p id="target-bundle-status">
+            Zone cible sélectionnée : aucune
           </p>
 
           <p id="local-bundle-catalog-status">
@@ -105,11 +113,11 @@
           </label>
           <label class="cs2-helper-field" for="cs2-helper-country">
             <span>Pays</span>
-            <input id="cs2-helper-country" type="text" value="United States" autocomplete="off">
+            <input id="cs2-helper-country" type="text" value="" autocomplete="off">
           </label>
           <label class="cs2-helper-field" for="cs2-helper-country-code">
             <span>Code pays</span>
-            <input id="cs2-helper-country-code" type="text" value="us" autocomplete="off">
+            <input id="cs2-helper-country-code" type="text" value="" autocomplete="off">
           </label>
           <label class="cs2-helper-field" for="cs2-helper-water-level">
             <span>Niveau eau conseillé</span>

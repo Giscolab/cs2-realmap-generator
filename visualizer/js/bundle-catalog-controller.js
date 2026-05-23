@@ -6,7 +6,9 @@
   var state = {
     bundleIndex: null,
     displayedBundleId: null,
-    selectedLocalBundleId: null
+    selectedLocalBundleId: null,
+    targetBundleId: null,
+    targetLabel: null
   };
 
   function byId(id) {
@@ -160,6 +162,149 @@
     );
   }
 
+
+
+  function parseBundleIdParts(bundleId) {
+    var match = String(bundleId || "").match(/^(.+)_([a-z]{2})_(-?\d+(?:\.\d+)?)_(-?\d+(?:\.\d+)?)$/i);
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      citySlug: match[1],
+      countryCode: match[2].toLowerCase(),
+      lat: Number(match[3]),
+      lon: Number(match[4])
+    };
+  }
+
+  function distanceKm(a, b) {
+    if (!a || !b) {
+      return Infinity;
+    }
+
+    if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon) || !Number.isFinite(b.lat) || !Number.isFinite(b.lon)) {
+      return Infinity;
+    }
+
+    var earthRadiusKm = 6371;
+    var dLat = (b.lat - a.lat) * Math.PI / 180;
+    var dLon = (b.lon - a.lon) * Math.PI / 180;
+    var lat1 = a.lat * Math.PI / 180;
+    var lat2 = b.lat * Math.PI / 180;
+
+    var h =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    return 2 * earthRadiusKm * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+
+  function findBundleForTarget(bundleId) {
+    var exact = findBundleById(bundleId);
+
+    if (exact) {
+      return exact;
+    }
+
+    var target = parseBundleIdParts(bundleId);
+
+    if (!target) {
+      return null;
+    }
+
+    var bundles = getBundlesFromIndex(state.bundleIndex);
+    var best = null;
+    var bestDistanceKm = Infinity;
+
+    bundles.forEach(function (bundle) {
+      var candidateId = getBundleId(bundle);
+      var candidate = parseBundleIdParts(candidateId);
+
+      if (!candidate) {
+        return;
+      }
+
+      if (candidate.citySlug !== target.citySlug || candidate.countryCode !== target.countryCode) {
+        return;
+      }
+
+      var d = distanceKm(target, candidate);
+
+      if (d < bestDistanceKm) {
+        best = bundle;
+        bestDistanceKm = d;
+      }
+    });
+
+    // Tolérance volontairement faible : corrige les arrondis type Paris 48.857000 vs 48.857487,
+    // mais évite de confondre deux bundles différents dans la même grande ville.
+    if (best && bestDistanceKm <= 1.0) {
+      return best;
+    }
+
+    return null;
+  }
+
+  function renderTargetStatus() {
+    var button = byId("load-target-bundle");
+
+    if (!state.targetBundleId) {
+      setText("target-bundle-status", "Zone cible sélectionnée : aucune");
+
+      if (button) {
+        button.disabled = true;
+      }
+
+      return;
+    }
+
+    var bundle = findBundleForTarget(state.targetBundleId);
+    var label = state.targetLabel || state.targetBundleId;
+
+    if (bundle) {
+      setText(
+        "target-bundle-status",
+        "Zone cible sélectionnée : " + label + " — bundle local disponible"
+      );
+
+      if (button) {
+        button.disabled = false;
+      }
+
+      return;
+    }
+
+    setText(
+      "target-bundle-status",
+      "Zone cible sélectionnée : " + label + " — bundle absent, génération requise"
+    );
+
+    if (button) {
+      button.disabled = true;
+    }
+  }
+
+  function loadTargetBundle() {
+    if (!state.targetBundleId) {
+      renderCatalogStatus("Aucun bundle cible.");
+      return;
+    }
+
+    var bundle = findBundleForTarget(state.targetBundleId);
+
+    if (!bundle) {
+      renderCatalogStatus("Bundle cible absent localement : " + state.targetBundleId);
+      renderTargetStatus();
+      return;
+    }
+
+    state.selectedLocalBundleId = getBundleId(bundle);
+    loadSelectedBundle();
+  }
+
   function renderCatalogStatus(message) {
     setText("local-bundle-catalog-status", message);
   }
@@ -214,12 +359,14 @@
 
       populateBundleSelect();
       renderDisplayedStatus();
+      renderTargetStatus();
     } catch (error) {
       console.warn("[BundleCatalog] Impossible de charger bundle_index.json", error);
       state.bundleIndex = null;
       populateBundleSelect();
       renderCatalogStatus("Catalogue local absent ou illisible : " + BUNDLE_INDEX_PATH);
       renderDisplayedStatus();
+      renderTargetStatus();
     }
   }
 
@@ -274,12 +421,28 @@
     if (unloadButton) {
       unloadButton.addEventListener("click", unloadDisplayedBundle);
     }
+
+    var targetButton = byId("load-target-bundle");
+    if (targetButton) {
+      targetButton.addEventListener("click", loadTargetBundle);
+    }
+
+    window.addEventListener("cs2zoning:target-bundle-updated", function (event) {
+      var detail = event.detail || {};
+
+      state.targetBundleId = detail.bundleId || null;
+      state.targetLabel = detail.label || detail.bundleId || null;
+
+      renderTargetStatus();
+    });
+
   }
 
   function init() {
     state.displayedBundleId = getDisplayedBundleIdFromUrl();
     bindEvents();
     renderDisplayedStatus();
+    renderTargetStatus();
     refreshCatalog();
   }
 

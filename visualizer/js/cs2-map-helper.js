@@ -35,11 +35,6 @@
 
   function getCityName(input) {
     var value = input && input.value ? String(input.value).trim() : "";
-
-    if (!value || value === "Zone CS2") {
-      return DEFAULT_BUNDLE_CITY;
-    }
-
     return value;
   }
 
@@ -236,6 +231,42 @@
     if (context.bundleIdOutput && document.activeElement !== context.bundleIdOutput) {
       context.bundleIdOutput.value = bundleMeta.id;
     }
+  }
+
+
+  function dispatchTargetBundleUpdate(context, state, bundleMeta) {
+    var rawCity = context.cityInput && context.cityInput.value
+      ? String(context.cityInput.value).trim()
+      : "";
+
+    if (!rawCity || !bundleMeta || !bundleMeta.id) {
+      window.dispatchEvent(new CustomEvent("cs2zoning:target-bundle-updated", {
+        detail: {
+          bundleId: "",
+          label: "",
+          city: "",
+          country: "",
+          countryCode: "",
+          worldBBox: "",
+          heightmapBBox: ""
+        }
+      }));
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("cs2zoning:target-bundle-updated", {
+      detail: {
+        bundleId: bundleMeta.id || "",
+        label: bundleMeta.city && bundleMeta.country
+          ? bundleMeta.city + ", " + bundleMeta.country
+          : bundleMeta.id,
+        city: bundleMeta.city || "",
+        country: bundleMeta.country || "",
+        countryCode: bundleMeta.countryCode || "",
+        worldBBox: state.worldMapBBoxText || "",
+        heightmapBBox: state.heightmapBBoxText || ""
+      }
+    }));
   }
 
   function buildCommand(cityName, bboxText, state, bundleMeta) {
@@ -803,7 +834,7 @@
     return JSON.stringify(config, null, 2);
   }
   function normalizeInformationPanel(context, cityName) {
-    var city = String(cityName || "").trim() || "Irvine";
+    var city = String(cityName || "").trim();
 
     if (context.cityNameInput) {
       context.cityNameInput.hidden = false;
@@ -862,7 +893,7 @@
   }
 
   function syncInformationPanel(context, cityName) {
-    var city = String(cityName || "").trim() || DEFAULT_BUNDLE_CITY;
+    var city = String(cityName || "").trim();
 
     if (context.cityInput && document.activeElement !== context.cityInput) {
       context.cityInput.value = city;
@@ -872,6 +903,48 @@
   function update(context, state) {
     var zoom = context.map.getZoom();
     var cityName = getCityName(context.cityInput);
+
+    context.currentWorldBBox = state.worldMapBBoxText;
+    context.currentHeightmapBBox = state.heightmapBBoxText;
+
+    if (!cityName) {
+      context.currentCommand = "";
+      context.currentFullBundleCommand = "";
+      context.currentTimelineManifest = "";
+      context.currentCs2PngContract = "";
+      context.currentExportBundleManifest = "";
+
+      syncInputs(context, state);
+
+      if (context.bundleIdOutput && document.activeElement !== context.bundleIdOutput) {
+        context.bundleIdOutput.value = "";
+      }
+
+      if (context.countryInput && document.activeElement !== context.countryInput) {
+        context.countryInput.value = "";
+      }
+
+      if (context.countryCodeInput && document.activeElement !== context.countryCodeInput) {
+        context.countryCodeInput.value = "";
+      }
+
+      dispatchTargetBundleUpdate(context, state, null);
+
+      setText(context.latOutput, formatNumber(state.center.lat, 6));
+      setText(context.lonOutput, formatNumber(state.center.lng, 6));
+      setText(context.zoomOutput, formatNumber(zoom, 2));
+      setText(context.worldBBoxOutput, state.worldMapBBoxText);
+      setText(context.heightmapBBoxOutput, state.heightmapBBoxText);
+      setText(context.commandOutput, "-");
+
+      context.fullBundleCommandOutput = ensureFullBundleCommandUi(context);
+      setText(context.fullBundleCommandOutput, "-");
+
+      hideBackendHelperBlocks(context);
+      setText(context.status, "");
+      return;
+    }
+
     var bundleMeta = getBundleMeta(context, state, cityName);
     var command = buildCommand(cityName, state.heightmapBBoxText, state, bundleMeta);
     var fullBundleCommand = buildFullBundleCommand(cityName, state, bundleMeta);
@@ -880,8 +953,6 @@
     var cs2PngContract = buildCs2PngContractText(state, bundleMeta);
     var exportBundleManifest = buildExportBundleManifestText(state, bundleMeta);
 
-    context.currentWorldBBox = state.worldMapBBoxText;
-    context.currentHeightmapBBox = state.heightmapBBoxText;
     context.currentCommand = command;
     context.currentFullBundleCommand = fullBundleCommand;
     context.currentTimelineManifest = timelineManifest;
@@ -891,6 +962,7 @@
 
     syncInputs(context, state);
     syncBundleUi(context, bundleMeta);
+    dispatchTargetBundleUpdate(context, state, bundleMeta);
     setText(context.latOutput, formatNumber(state.center.lat, 6));
     setText(context.lonOutput, formatNumber(state.center.lng, 6));
     setText(context.zoomOutput, formatNumber(zoom, 2));
@@ -1317,9 +1389,3 @@
     create: create
   };
 })(window.CS2Zoning = window.CS2Zoning || {});
-
-
-
-
-
-
