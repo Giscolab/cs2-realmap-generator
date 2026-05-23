@@ -30,15 +30,50 @@
     }
   }
 
+
+  function getExplicitPackIndexPath() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var value = params.get("packIndexPath");
+
+      if (!value) {
+        return "";
+      }
+
+      return value.trim();
+    } catch (error) {
+      console.warn("[Visualizer] Impossible de lire packIndexPath dans l'URL.", error);
+      return "";
+    }
+  }
+
   function loadPackOrFallback() {
     if (!App.PackLoader || !App.PackLoader.loadDefaultPack) {
       return Promise.resolve(null);
     }
 
-    return App.PackLoader.loadDefaultPack(App.Config).catch(function (error) {
-console.warn("[CS2Zoning] Pack exports introuvable ou illisible. Le visualiseur reste en attente de données.", error);
-      return null;
-    });
+    var explicitPackIndexPath = getExplicitPackIndexPath();
+
+    if (explicitPackIndexPath) {
+      var config = Object.assign({}, App.Config, {
+        packIndexPath: explicitPackIndexPath
+      });
+
+      if (App.Status && App.Status.set) {
+        App.Status.set("Chargement du bundle sélectionné");
+      }
+
+      return App.PackLoader.loadDefaultPack(config).catch(function (error) {
+        console.warn("[CS2Zoning] Pack sélectionné introuvable ou illisible.", error);
+        throw error;
+      });
+    }
+
+    console.info("[Visualizer] Démarrage sans bundle chargé automatiquement.");
+    if (App.Status && App.Status.set) {
+      App.Status.set("Catalogue local uniquement — aucun bundle chargé");
+    }
+    return Promise.resolve(null);
   }
 
   function bootstrap() {
@@ -99,5 +134,3 @@ console.warn("[CS2Zoning] Pack exports introuvable ou illisible. Le visualiseur 
     bootstrap();
   }
 })(window.CS2Zoning = window.CS2Zoning || {});
-
-

@@ -49,6 +49,40 @@
           <span id="dataset-status" class="status-pill">Initialisation</span>
           <span id="dataset-substatus" class="status-detail">Lecture des données locales</span>
         </div>
+
+        <section class="catalog-panel" id="local-bundle-catalog-panel">
+          <h2>Bundles locaux</h2>
+
+          <div class="catalog-row">
+            <label for="local-bundle-select">Bundle local disponible</label>
+            <select id="local-bundle-select">
+              <option value="">-- sélectionner un bundle --</option>
+            </select>
+          </div>
+
+          <div class="catalog-actions">
+            <button id="load-selected-local-bundle" type="button">
+              Charger le bundle sélectionné
+            </button>
+
+            <button id="refresh-bundle-catalog" type="button">
+              Actualiser catalogue
+            </button>
+
+            <button id="unload-displayed-bundle" type="button">
+              Décharger le pack affiché
+            </button>
+          </div>
+
+          <p id="displayed-bundle-status">
+            Pack affiché actuellement : aucun
+          </p>
+
+          <p id="local-bundle-catalog-status">
+            Catalogue local non chargé
+          </p>
+        </section>
+
       </header>
 
       <section class="metrics-section" aria-labelledby="metrics-title">
@@ -67,7 +101,7 @@
         <div class="cs2-helper-inputs">
           <label class="cs2-helper-field" for="cs2-helper-city">
             <span>Nom</span>
-            <input id="cs2-helper-city" type="text" value="Irvine" autocomplete="off">
+            <input id="cs2-helper-city" type="text" value="" autocomplete="off">
           </label>
           <label class="cs2-helper-field" for="cs2-helper-country">
             <span>Pays</span>
@@ -83,7 +117,7 @@
           </label>
           <label class="cs2-helper-field" for="cs2-helper-bundle-id">
             <span>Bundle ID</span>
-            <input id="cs2-helper-bundle-id" type="text" value="irvine_ca_us_33.653495_-117.723999" readonly>
+            <input id="cs2-helper-bundle-id" type="text" value="" readonly>
           </label>
           <label class="cs2-helper-field" for="cs2-helper-size">
             <span>World map (km)</span>
@@ -230,9 +264,7 @@
   <script src="./js/location-navigator.js"></script>
   <script src="./js/cs2-overlay-controller.js"></script>
   <script src="./js/cs2-map-helper.js"></script>
+  <script src="./js/bundle-catalog-controller.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>
-
-
-
