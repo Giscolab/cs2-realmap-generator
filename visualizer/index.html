@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS2 Zonage Réel - Tableau de bord</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="./styles/tokens.css">
+  <link rel="stylesheet" href="./styles/app.css">
+</head>
+<body>
+  <main class="app-shell" aria-label="Visualiseur de zonage réel pour Cities: Skylines II">
+    <div id="map" class="map-canvas" aria-label="Carte interactive des zones extraites d'OpenStreetMap"></div>
+
+    <nav id="location-navigator" class="location-navigator" aria-label="Navigateur mondial">
+      <div class="location-heading">
+        <span class="location-kicker">Monde</span>
+        <strong>Navigation rapide</strong>
+      </div>
+      <label class="location-field" for="location-continent">
+        <span>Continent</span>
+        <select id="location-continent" autocomplete="off"></select>
+      </label>
+      <label class="location-field" for="location-country">
+        <span>Pays</span>
+        <select id="location-country" autocomplete="off" disabled></select>
+      </label>
+      <label class="location-field" for="location-capital">
+        <span>Capitale</span>
+        <select id="location-capital" autocomplete="off" disabled></select>
+      </label>
+      <button id="location-go" type="button" class="location-go" disabled>Aller</button>
+      <span id="location-status" class="location-status" aria-live="polite">Sélectionnez une zone</span>
+    </nav>
+
+    <aside id="dashboard" class="dashboard-panel" aria-label="Tableau de bord de zonage">
+      <header class="app-header">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">CS2</div>
+          <div>
+            <p class="eyebrow">Analyse géospatiale</p>
+            <h1>CS2 Zonage Réel</h1>
+            <p class="subtitle">Correspondance OpenStreetMap vers les zones Cities: Skylines II</p>
+          </div>
+        </div>
+        <div class="dataset-status" aria-live="polite">
+          <span id="dataset-status" class="status-pill">Initialisation</span>
+          <span id="dataset-substatus" class="status-detail">Lecture des données locales</span>
+        </div>
+      </header>
+
+      <section class="metrics-section" aria-labelledby="metrics-title">
+        <div class="section-heading">
+          <h2 id="metrics-title">Indicateurs</h2>
+          <span id="metrics-context" class="section-meta">Jeu de données local</span>
+        </div>
+        <div id="metrics-grid" class="metrics-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="cs2-helper-section" aria-labelledby="cs2-helper-title">
+        <div class="section-heading">
+          <h2 id="cs2-helper-title">Informations</h2>
+          <span id="cs2-helper-status" class="section-meta">Overlay CS2</span>
+        </div>
+        <div class="cs2-helper-inputs">
+          <label class="cs2-helper-field" for="cs2-helper-city">
+            <span>Nom</span>
+            <input id="cs2-helper-city" type="text" value="Irvine" autocomplete="off">
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-country">
+            <span>Pays</span>
+            <input id="cs2-helper-country" type="text" value="United States" autocomplete="off">
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-country-code">
+            <span>Code pays</span>
+            <input id="cs2-helper-country-code" type="text" value="us" autocomplete="off">
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-water-level">
+            <span>Niveau eau conseillé</span>
+            <input id="cs2-helper-water-level" type="number" step="0.001" value="511.7">
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-bundle-id">
+            <span>Bundle ID</span>
+            <input id="cs2-helper-bundle-id" type="text" value="irvine_ca_us_33.653495_-117.723999" readonly>
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-size">
+            <span>World map (km)</span>
+            <input id="cs2-helper-size" type="number" min="0.1" max="500" step="0.001" value="57.344">
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-heightmap-size">
+            <span>Heightmap (km)</span>
+            <input id="cs2-helper-heightmap-size" type="number" min="0.1" max="500" step="0.001" value="14.336">
+          </label>
+          <label class="cs2-helper-field" for="cs2-helper-step">
+            <span>Pas</span>
+            <select id="cs2-helper-step">
+              <option value="1">1 m</option>
+              <option value="10" selected>10 m</option>
+              <option value="100">100 m</option>
+              <option value="1000">1 km</option>
+            </select>
+          </label>
+        </div>
+        <dl class="cs2-helper-readouts">
+          <div>
+            <dt>Latitude centre</dt>
+            <dd id="cs2-helper-lat">-</dd>
+          </div>
+          <div>
+            <dt>Longitude centre</dt>
+            <dd id="cs2-helper-lon">-</dd>
+          </div>
+          <div>
+            <dt>Zoom Leaflet</dt>
+            <dd id="cs2-helper-zoom">-</dd>
+          </div>
+        </dl>
+        <div class="cs2-helper-nudge" aria-label="Déplacement précis de l'overlay CS2">
+          <button id="cs2-move-north" type="button" class="nudge-button nudge-north">Nord</button>
+          <button id="cs2-move-west" type="button" class="nudge-button nudge-west">Ouest</button>
+          <button id="cs2-move-east" type="button" class="nudge-button nudge-east">Est</button>
+          <button id="cs2-move-south" type="button" class="nudge-button nudge-south">Sud</button>
+        </div>
+        <div class="cs2-helper-actions">
+          <button id="sync-cs2-overlay" type="button" class="control-button">Synchroniser centre carte</button>
+          <button id="fit-cs2-overlay" type="button" class="control-button control-button-primary">Centrer sur overlay</button>
+        </div>
+        <div class="cs2-helper-output">
+          <div class="cs2-helper-output-heading">
+            <span>BBOX world map</span>
+            <button id="copy-cs2-bbox" type="button" class="copy-button">Copier</button>
+          </div>
+          <output id="cs2-helper-bbox">-</output>
+        </div>
+        <div class="cs2-helper-output">
+          <div class="cs2-helper-output-heading">
+            <span>BBOX heightmap</span>
+            <button id="copy-cs2-heightmap-bbox" type="button" class="copy-button">Copier</button>
+          </div>
+          <output id="cs2-helper-heightmap-bbox">-</output>
+        </div>
+        <div class="cs2-helper-output">
+          <div class="cs2-helper-output-heading">
+            <span>Commande Python</span>
+            <button id="copy-cs2-command" type="button" class="copy-button">Copier</button>
+          </div>
+          <output id="cs2-helper-command">-</output>
+        </div>
+		<div class="cs2-helper-output">
+  <div class="cs2-helper-output-heading">
+    <span>Commande bundle complet</span>
+    <button id="copy-cs2-bundle-command" type="button" class="copy-button">Copier</button>
+  </div>
+  <output id="cs2-helper-bundle-command">-</output>
+</div>
+        <div class="cs2-helper-output">
+          <div class="cs2-helper-output-heading">
+            <span>Contrat TimelineMod / Manifest JSON</span>
+            <button id="copy-cs2-timeline-manifest" type="button" class="copy-button">Copier</button>
+            <button id="download-cs2-timeline-manifest" type="button" class="copy-button">Télécharger</button>
+          </div>
+          <output id="cs2-helper-timeline-manifest">-</output>
+        </div>
+
+        <div class="cs2-helper-output">
+          <div class="cs2-helper-output-heading">
+            <span>Config CityTimelineMod / config.json</span>
+            <button id="copy-cs2-timeline-config" type="button" class="copy-button">Copier</button>
+            <button id="download-cs2-timeline-config" type="button" class="copy-button">Télécharger</button>
+          </div>
+          <output id="cs2-helper-timeline-config">-</output>
+        </div>
+      </section>
+
+      <section class="controls-section" aria-labelledby="layers-title">
+        <div class="section-heading">
+          <h2 id="layers-title">Couches</h2>
+          <span id="visible-count" class="section-meta">0 active</span>
+        </div>
+        <div class="toolbar" aria-label="Actions rapides sur les couches">
+          <button id="show-all-layers" type="button" class="control-button">Tout afficher</button>
+          <button id="hide-all-layers" type="button" class="control-button">Tout masquer</button>
+          <button id="reset-view" type="button" class="control-button control-button-primary">Recentrer</button>
+        </div>
+        <div id="layer-controls" class="layer-list" role="list"></div>
+      </section>
+
+      <section class="legend-section" aria-labelledby="legend-title">
+        <div class="section-heading">
+          <h2 id="legend-title">Légende CS2</h2>
+          <span class="section-meta">Couleurs de zonage</span>
+        </div>
+        <p class="legend-note">Chaque objet conserve ses données OSM et affiche le pinceau CS2 recommandé.</p>
+        <div id="legend-list" class="legend-list"></div>
+      </section>
+    </aside>
+
+    <button id="panel-toggle" type="button" class="panel-toggle" aria-controls="dashboard" aria-expanded="true">
+      Panneau
+    </button>
+
+    <section id="empty-state" class="state-card empty-state" hidden aria-live="polite">
+      <p class="eyebrow">Aucune donnée détectée</p>
+      <h2>Le visualiseur est prêt.</h2>
+      <p>Générez un pack <code>exports/bundles/&lt;bundle_id&gt;/geojson_pack</code> avec le pipeline pour afficher les objets réels.</p>    </section>
+
+    <section id="app-error" class="state-card error-state" hidden role="alert">
+      <p class="eyebrow">Erreur du visualiseur</p>
+      <h2>La carte n'a pas pu être initialisée.</h2>
+      <p id="app-error-message">Erreur inconnue.</p>
+    </section>
+
+    <div id="app-loading" class="loading-screen" aria-live="polite">
+      <div class="loading-ring" aria-hidden="true"></div>
+      <p>Chargement du tableau de bord</p>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./data/world_capitals.js"></script>
+  <script src="./js/config.js"></script>
+  <script src="./js/safe-html.js"></script>
+  <script src="./js/pack-loader.js"></script>
+  <script src="./js/data-adapter.js"></script>
+  <script src="./js/stats.js"></script>
+  <script src="./js/map-controller.js"></script>
+  <script src="./js/panel-controller.js"></script>
+  <script src="./js/location-navigator.js"></script>
+  <script src="./js/cs2-overlay-controller.js"></script>
+  <script src="./js/cs2-map-helper.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
+
+
+
