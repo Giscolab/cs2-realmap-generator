@@ -86,44 +86,53 @@
     );
   }
 
-  function slugifyCountryCode(value) {
-    var text = String(value || "")
+  var COUNTRY_CODE_ALIASES = {
+    "tchequie": "cz",
+    "czechia": "cz",
+    "czech-republic": "cz",
+    "republique-tcheque": "cz",
+    "france": "fr",
+    "germany": "de",
+    "allemagne": "de",
+    "italy": "it",
+    "italie": "it",
+    "spain": "es",
+    "espagne": "es",
+    "united-states": "us",
+    "etats-unis": "us",
+    "china": "cn",
+    "chine": "cn",
+    "japan": "jp",
+    "japon": "jp",
+    "united-kingdom": "gb",
+    "royaume-uni": "gb",
+    "burkina-faso": "bf"
+  };
+
+  function normalizeCountryCodeKey(value) {
+    return String(value || "")
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-      .trim();
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
 
-    var aliases = {
-      "tchequie": "cz",
-      "czechia": "cz",
-      "czech republic": "cz",
-      "republique tcheque": "cz",
-      "france": "fr",
-      "germany": "de",
-      "allemagne": "de",
-      "italy": "it",
-      "italie": "it",
-      "spain": "es",
-      "espagne": "es",
-      "united states": "us",
-      "etats unis": "us",
-      "états unis": "us",
-      "china": "cn",
-      "chine": "cn",
-      "japan": "jp",
-      "japon": "jp",
-      "united kingdom": "gb",
-      "royaume uni": "gb"
-    };
+  function slugifyCountryCode(value) {
+    var raw = String(value || "").trim().toLowerCase();
 
-    if (aliases[text]) {
-      return aliases[text];
+    if (/^[a-z]{2}$/.test(raw)) {
+      return raw;
     }
 
-    return text
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 8) || "xx";
+    var key = normalizeCountryCodeKey(value);
+
+    if (COUNTRY_CODE_ALIASES[key]) {
+      return COUNTRY_CODE_ALIASES[key];
+    }
+
+    return key.slice(0, 2) || "xx";
   }
 
   function notifyLocationSelected(context) {

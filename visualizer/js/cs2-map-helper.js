@@ -84,53 +84,66 @@
       .trim();
   }
 
-  function resolveCountryCode(value, countryName) {
-    var aliases = {
-      "indonesie": "id",
-      "indonesia": "id",
-      "israel": "il",
-      "tchequie": "cz",
-      "czechia": "cz",
-      "etats unis": "us",
-      "united states": "us",
-      "usa": "us",
-      "france": "fr",
-      "allemagne": "de",
-      "germany": "de",
-      "italie": "it",
-      "italy": "it",
-      "espagne": "es",
-      "spain": "es",
-      "royaume uni": "gb",
-      "united kingdom": "gb",
-      "uk": "gb",
-      "japon": "jp",
-      "japan": "jp",
-      "chine": "cn",
-      "china": "cn",
-      "bresil": "br",
-      "brazil": "br",
-      "mexique": "mx",
-      "mexico": "mx",
-      "australie": "au",
-      "australia": "au",
-      "canada": "ca"
-    };
+  var COUNTRY_CODE_ALIASES = {
+    "indonesie": "id",
+    "indonesia": "id",
+    "israel": "il",
+    "tchequie": "cz",
+    "czechia": "cz",
+    "czech-republic": "cz",
+    "republique-tcheque": "cz",
+    "etats-unis": "us",
+    "united-states": "us",
+    "usa": "us",
+    "france": "fr",
+    "allemagne": "de",
+    "germany": "de",
+    "italie": "it",
+    "italy": "it",
+    "espagne": "es",
+    "spain": "es",
+    "royaume-uni": "gb",
+    "united-kingdom": "gb",
+    "uk": "gb",
+    "japon": "jp",
+    "japan": "jp",
+    "chine": "cn",
+    "china": "cn",
+    "bresil": "br",
+    "brazil": "br",
+    "mexique": "mx",
+    "mexico": "mx",
+    "australie": "au",
+    "australia": "au",
+    "canada": "ca",
+    "burkina-faso": "bf"
+  };
 
+  function normalizeCountryKey(value) {
+    return stripAccents(value)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  function resolveCountryCode(value, countryName) {
     var rawCode = String(value || "").trim().toLowerCase();
 
     if (/^[a-z]{2}$/.test(rawCode)) {
       return rawCode;
     }
 
-    var normalizedCode = normalizeCountryLookup(value);
-    if (aliases[normalizedCode]) {
-      return aliases[normalizedCode];
+    var normalizedCode = normalizeCountryKey(value);
+
+    if (COUNTRY_CODE_ALIASES[normalizedCode]) {
+      return COUNTRY_CODE_ALIASES[normalizedCode];
     }
 
-    var normalizedCountry = normalizeCountryLookup(countryName);
-    if (aliases[normalizedCountry]) {
-      return aliases[normalizedCountry];
+    var normalizedCountry = normalizeCountryKey(countryName);
+
+    if (COUNTRY_CODE_ALIASES[normalizedCountry]) {
+      return COUNTRY_CODE_ALIASES[normalizedCountry];
     }
 
     return slugifyBundlePart(value || countryName, DEFAULT_BUNDLE_COUNTRY_CODE).slice(0, 2);
@@ -928,13 +941,16 @@
         context.countryCodeInput.value = "";
       }
 
+      context.currentWorldBBox = "";
+      context.currentHeightmapBBox = "";
+
       dispatchTargetBundleUpdate(context, state, null);
 
-      setText(context.latOutput, formatNumber(state.center.lat, 6));
-      setText(context.lonOutput, formatNumber(state.center.lng, 6));
-      setText(context.zoomOutput, formatNumber(zoom, 2));
-      setText(context.worldBBoxOutput, state.worldMapBBoxText);
-      setText(context.heightmapBBoxOutput, state.heightmapBBoxText);
+      setText(context.latOutput, "-");
+      setText(context.lonOutput, "-");
+      setText(context.zoomOutput, "-");
+      setText(context.worldBBoxOutput, "-");
+      setText(context.heightmapBBoxOutput, "-");
       setText(context.commandOutput, "-");
 
       context.fullBundleCommandOutput = ensureFullBundleCommandUi(context);
@@ -1185,6 +1201,111 @@
     return stepMeters >= 1000 ? "1 km" : stepMeters + " m";
   }
 
+
+  var COUNTRY_NAME_BY_CODE = {
+    "bf": "Burkina Faso",
+    "fr": "France",
+    "us": "United States",
+    "cz": "Czechia",
+    "id": "Indonesia",
+    "il": "Israel",
+    "gb": "United Kingdom",
+    "de": "Germany",
+    "it": "Italy",
+    "es": "Spain",
+    "jp": "Japan",
+    "cn": "China",
+    "br": "Brazil",
+    "mx": "Mexico",
+    "au": "Australia",
+    "ca": "Canada"
+  };
+
+  function titleCaseBundleSlug(value) {
+    return String(value || "")
+      .split("_")
+      .filter(Boolean)
+      .map(function (part) {
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(" ");
+  }
+
+  function getDisplayedBundleIdFromPackData(packData) {
+    var indexPath = packData ? String(packData.indexPath || "") : "";
+    var match = indexPath.match(/(?:^|\/)exports\/bundles\/([^\/]+)\/geojson_pack\/reports\/layer_index\.json/i);
+
+    if (!match) {
+      return "";
+    }
+
+    return sanitizeBundleId(decodeURIComponent(match[1]));
+  }
+
+  function parseDisplayedBundleMeta(packData) {
+    var bundleId = getDisplayedBundleIdFromPackData(packData);
+    var match = bundleId.match(/^(.+)_([a-z]{2})_(-?\d+(?:\.\d+)?)_(-?\d+(?:\.\d+)?)$/i);
+
+    if (!match) {
+      return null;
+    }
+
+    var countryCode = match[2].toLowerCase();
+    var lat = Number(match[3]);
+    var lng = Number(match[4]);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    return {
+      id: bundleId,
+      city: titleCaseBundleSlug(match[1]),
+      countryCode: countryCode,
+      country: COUNTRY_NAME_BY_CODE[countryCode] || countryCode.toUpperCase(),
+      center: {
+        lat: lat,
+        lng: lng
+      }
+    };
+  }
+
+  function hydrateTargetFromDisplayedBundle(context) {
+    if (!context || !context.packData) {
+      return false;
+    }
+
+    var meta = parseDisplayedBundleMeta(context.packData);
+
+    if (!meta) {
+      return false;
+    }
+
+    if (context.cityInput) {
+      context.cityInput.value = meta.city;
+    }
+
+    if (context.countryInput) {
+      context.countryInput.value = meta.country;
+    }
+
+    if (context.countryCodeInput) {
+      context.countryCodeInput.value = meta.countryCode;
+    }
+
+    if (context.bundleIdOutput) {
+      context.bundleIdOutput.value = meta.id;
+    }
+
+    if (context.overlayController) {
+      context.overlayController.setCenter(meta.center);
+    }
+
+    console.info("[CS2 Helper] Emplacement courant hydraté depuis le bundle chargé:", meta);
+
+    return true;
+  }
+
   function updateFromController(context) {
     update(context, context.overlayController.getState());
   }
@@ -1313,6 +1434,7 @@
       map: mapController && mapController.map,
       overlayController: overlayController,
       status: byId("cs2-helper-status"),
+      packData: options.packData || null,
       cityInput: byId("cs2-helper-city"),
       countryInput: byId("cs2-helper-country"),
       countryCodeInput: byId("cs2-helper-country-code"),
@@ -1376,6 +1498,7 @@
     }
 
     bind(context);
+    hydrateTargetFromDisplayedBundle(context);
     updateFromController(context);
 
     return {

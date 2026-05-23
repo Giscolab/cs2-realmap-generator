@@ -249,16 +249,9 @@
   }
 
   function renderTargetStatus() {
-    var button = byId("load-target-bundle");
-
     if (!state.targetBundleId) {
       setText("target-bundle-status", "Zone cible sélectionnée : aucune");
-
-      if (button) {
-        button.disabled = true;
-      }
-
-      return;
+return;
     }
 
     var bundle = findBundleForTarget(state.targetBundleId);
@@ -269,41 +262,14 @@
         "target-bundle-status",
         "Zone cible sélectionnée : " + label + " — bundle local disponible"
       );
-
-      if (button) {
-        button.disabled = false;
-      }
-
-      return;
+return;
     }
 
     setText(
       "target-bundle-status",
       "Zone cible sélectionnée : " + label + " — bundle absent, génération requise"
     );
-
-    if (button) {
-      button.disabled = true;
-    }
-  }
-
-  function loadTargetBundle() {
-    if (!state.targetBundleId) {
-      renderCatalogStatus("Aucun bundle cible.");
-      return;
-    }
-
-    var bundle = findBundleForTarget(state.targetBundleId);
-
-    if (!bundle) {
-      renderCatalogStatus("Bundle cible absent localement : " + state.targetBundleId);
-      renderTargetStatus();
-      return;
-    }
-
-    state.selectedLocalBundleId = getBundleId(bundle);
-    loadSelectedBundle();
-  }
+}
 
   function renderCatalogStatus(message) {
     setText("local-bundle-catalog-status", message);
@@ -421,13 +387,7 @@
     if (unloadButton) {
       unloadButton.addEventListener("click", unloadDisplayedBundle);
     }
-
-    var targetButton = byId("load-target-bundle");
-    if (targetButton) {
-      targetButton.addEventListener("click", loadTargetBundle);
-    }
-
-    window.addEventListener("cs2zoning:target-bundle-updated", function (event) {
+window.addEventListener("cs2zoning:target-bundle-updated", function (event) {
       var detail = event.detail || {};
 
       state.targetBundleId = detail.bundleId || null;
