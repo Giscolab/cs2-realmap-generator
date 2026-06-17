@@ -31,6 +31,13 @@
   }
 
 
+  function isValidPackIndexPath(value) {
+    // N'autorise qu'un layer_index.json sous ../exports/bundles/<bundleId>/...
+    // et interdit toute remontée de chemin (.. au-delà du préfixe).
+    var pattern = /^\.\.\/exports\/bundles\/[A-Za-z0-9._-]+\/geojson_pack\/reports\/layer_index\.json$/;
+    return pattern.test(value) && value.indexOf("..", 1) === -1;
+  }
+
   function getExplicitPackIndexPath() {
     try {
       var params = new URLSearchParams(window.location.search || "");
@@ -40,7 +47,14 @@
         return "";
       }
 
-      return value.trim();
+      var trimmed = value.trim();
+
+      if (!isValidPackIndexPath(trimmed)) {
+        console.warn("[Visualizer] packIndexPath refusé (attendu ../exports/bundles/<id>/geojson_pack/reports/layer_index.json) :", trimmed);
+        return "";
+      }
+
+      return trimmed;
     } catch (error) {
       console.warn("[Visualizer] Impossible de lire packIndexPath dans l'URL.", error);
       return "";

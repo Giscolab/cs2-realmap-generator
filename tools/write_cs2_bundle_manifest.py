@@ -4,24 +4,13 @@ import argparse
 import json
 import math
 import re
+import sys
 import unicodedata
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-COUNTRY_CODE_ALIASES = {
-    "france": "fr",
-    "republique francaise": "fr",
-    "république française": "fr",
-    "china": "cn",
-    "chine": "cn",
-    "people_s_republic_of_china": "cn",
-    "united states": "us",
-    "united states of america": "us",
-    "usa": "us",
-    "us": "us",
-    "etats unis": "us",
-    "états unis": "us",
-}
+from country_codes import UnknownCountryCodeError, resolve_country_code
 
 
 def round_number(value: float, digits: int) -> float:
@@ -82,14 +71,10 @@ def sanitize_bundle_id(value: str) -> str:
 
 
 def country_slug(country: str, country_code: str | None) -> str:
-    if country_code:
-        return slugify(country_code, "xx")
-
-    key = slugify(country, "")
-    if key in COUNTRY_CODE_ALIASES:
-        return COUNTRY_CODE_ALIASES[key]
-
-    return slugify(country, "xx")
+    try:
+        return resolve_country_code(country_code, country)
+    except UnknownCountryCodeError as exc:
+        raise SystemExit(f"[ERREUR] {exc}") from exc
 
 
 def build_bundle_id(
@@ -367,6 +352,93 @@ def check_existing(repo_root: Path, manifest: dict) -> int:
     return 1
 
 
+def _parse_bbox(text: str) -> tuple[float, float, float, float]:
+    try:
+        parts = [float(part.strip()) for part in str(text).split(",")]
+    except ValueError as exc:
+        raise SystemExit(f"[ERREUR] BBOX non numérique : {text!r}") from exc
+
+    if len(parts) != 4:
+        raise SystemExit(f"[ERREUR] BBOX invalide (4 valeurs attendues sud,ouest,nord,est) : {text!r}")
+
+    return parts[0], parts[1], parts[2], parts[3]
+
+
+def validate_manifest_invariants(manifest: dict, *, span_tolerance: float = 0.10) -> None:
+    """Garde-fous du contrat manifeste (D1).
+
+    Lève SystemExit si une incohérence interne est détectée, pour empêcher
+    l'écriture d'un manifeste contradictoire. Invariants vérifiés :
+      1. Tailles worldmap/heightmap strictement positives.
+      2. Si les tailles diffèrent, les bbox doivent différer.
+      3. BBOX bien ordonnées (sud<nord, ouest<est) et cohérentes avec sizeKm
+         (étendue en latitude à span_tolerance près).
+      4. Les noms de PNG portent la taille correspondant à leur carte.
+    """
+    world = manifest["worldMap"]
+    height = manifest["heightmap"]
+    world_km = float(world["sizeKm"])
+    height_km = float(height["sizeKm"])
+
+    if world_km <= 0 or height_km <= 0:
+        raise SystemExit(
+            f"[ERREUR] Tailles de carte invalides : worldMap={world_km}, heightmap={height_km}"
+        )
+
+    world_bbox = str(world["bbox"])
+    height_bbox = str(height["bbox"])
+
+    # (2) Tailles différentes => bbox obligatoirement différentes.
+    if abs(world_km - height_km) > 1e-9 and world_bbox == height_bbox:
+        raise SystemExit(
+            "[ERREUR] Contrat manifeste incohérent : worldMap.sizeKm "
+            f"({world_km}) != heightmap.sizeKm ({height_km}) mais les deux bbox "
+            f"sont identiques ({world_bbox}). Vérifiez --world-bbox / --heightmap-bbox."
+        )
+
+    # (3) BBOX bien formées + cohérentes avec leur taille déclarée.
+    for label, bbox_text, size_km in (
+        ("worldMap", world_bbox, world_km),
+        ("heightmap", height_bbox, height_km),
+    ):
+        south, west, north, east = _parse_bbox(bbox_text)
+
+        if not (south < north and west < east):
+            raise SystemExit(
+                f"[ERREUR] BBOX {label} mal ordonnée (attendu sud<nord, ouest<est) : {bbox_text}"
+            )
+
+        _, meters_per_deg_lat = meters_per_degree((south + north) / 2.0)
+        expected_lat_span = (size_km * 1000.0) / meters_per_deg_lat
+        actual_lat_span = north - south
+
+        if expected_lat_span > 0:
+            ratio = abs(actual_lat_span - expected_lat_span) / expected_lat_span
+            if ratio > span_tolerance:
+                raise SystemExit(
+                    f"[ERREUR] BBOX {label} incohérente avec sizeKm={size_km} : "
+                    f"étendue latitude {actual_lat_span:.6f}° vs attendue "
+                    f"{expected_lat_span:.6f}° (écart {ratio * 100:.0f}% > "
+                    f"{span_tolerance * 100:.0f}%)."
+                )
+
+    # (4) Les noms de fichiers PNG doivent porter la bonne taille.
+    world_png = str(manifest["paths"]["worldmapPng"])
+    height_png = str(manifest["paths"]["heightmapPng"])
+    world_token = f"_{round_number(world_km, 3)}.png"
+    height_token = f"_{round_number(height_km, 3)}.png"
+
+    if not world_png.endswith(world_token):
+        raise SystemExit(
+            f"[ERREUR] Nom de worldmap PNG ne porte pas sa taille ({world_token}) : {world_png}"
+        )
+
+    if not height_png.endswith(height_token):
+        raise SystemExit(
+            f"[ERREUR] Nom de heightmap PNG ne porte pas sa taille ({height_token}) : {height_png}"
+        )
+
+
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -500,6 +572,7 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parents[1]
     manifest = build_manifest(args)
+    validate_manifest_invariants(manifest)
 
     out_path = resolve_repo_path(repo_root, manifest["paths"]["bundleManifest"])
     write_json(out_path, manifest)

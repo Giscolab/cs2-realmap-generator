@@ -5,6 +5,7 @@ import io
 import json
 import math
 import os
+import re
 import urllib.request
 from pathlib import Path
 
@@ -53,6 +54,11 @@ def terrain_rgb_to_height(r: np.ndarray, g: np.ndarray, b: np.ndarray) -> np.nda
     return -10000.0 + (r.astype(np.float32) * 6553.6) + (g.astype(np.float32) * 25.6) + (b.astype(np.float32) * 0.1)
 
 
+def _redact_secrets(text) -> str:
+    """Masque les clés API (key=, access_token=) dans un texte/URL avant log."""
+    return re.sub(r"((?:key|access_token)=)[^&\s]+", r"\1***", str(text))
+
+
 def build_tile_url(provider: str, zoom: int, x: int, y: int, token: str) -> str:
     provider = provider.lower()
 
@@ -78,9 +84,9 @@ def fetch_bytes(url: str, retries: int = 4, timeout: int = 60) -> bytes:
                 return response.read()
         except Exception as exc:
             last_error = exc
-            print(f"      tentative {attempt}/{retries} échouée : {exc}")
+            print(f"      tentative {attempt}/{retries} échouée : {_redact_secrets(exc)}")
 
-    raise RuntimeError(f"Téléchargement tuile impossible après {retries} tentatives : {last_error}")
+    raise RuntimeError(f"Téléchargement tuile impossible après {retries} tentatives : {_redact_secrets(last_error)}")
 
 
 def fetch_tile_elevation(provider: str, zoom: int, x: int, y: int, token: str, retries: int) -> np.ndarray:

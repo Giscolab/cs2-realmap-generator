@@ -86,64 +86,34 @@
     );
   }
 
-  var COUNTRY_CODE_ALIASES = {
-    "tchequie": "cz",
-    "czechia": "cz",
-    "czech-republic": "cz",
-    "republique-tcheque": "cz",
-    "france": "fr",
-    "germany": "de",
-    "allemagne": "de",
-    "italy": "it",
-    "italie": "it",
-    "spain": "es",
-    "espagne": "es",
-    "united-states": "us",
-    "etats-unis": "us",
-    "china": "cn",
-    "chine": "cn",
-    "japan": "jp",
-    "japon": "jp",
-    "united-kingdom": "gb",
-    "royaume-uni": "gb",
-    "burkina-faso": "bf"
-  };
-
-  function normalizeCountryCodeKey(value) {
-    return String(value || "")
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  }
-
   function slugifyCountryCode(value) {
-    var raw = String(value || "").trim().toLowerCase();
-
-    if (/^[a-z]{2}$/.test(raw)) {
-      return raw;
+    if (!App.CountryCodes || !App.CountryCodes.resolve) {
+      throw new Error("Référentiel de codes pays indisponible.");
     }
 
-    var key = normalizeCountryCodeKey(value);
-
-    if (COUNTRY_CODE_ALIASES[key]) {
-      return COUNTRY_CODE_ALIASES[key];
-    }
-
-    return key.slice(0, 2) || "xx";
+    return App.CountryCodes.resolve(value);
   }
 
   function notifyLocationSelected(context) {
     var country = getSelectedCountry(context);
     var capital = getSelectedCapital(context);
 
+    var countryCode = "";
+
+    if (country) {
+      try {
+        countryCode = slugifyCountryCode(country.code || country.iso2 || country.name);
+      } catch (error) {
+        console.warn("[LocationNavigator] Code pays inconnu.", error);
+        setStatus(context, error && error.message ? error.message : "Code pays inconnu");
+      }
+    }
+
     window.dispatchEvent(new CustomEvent("cs2zoning:location-selected", {
       detail: {
         center: context.map.getCenter(),
         country: country ? country.name : "",
-        countryCode: country ? slugifyCountryCode(country.code || country.iso2 || country.name) : "",
+        countryCode: countryCode,
         city: capital ? capital.name : ""
       }
     }));

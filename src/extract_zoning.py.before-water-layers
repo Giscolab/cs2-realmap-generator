@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-extract_zoning.py — Pipeline d’extraction OpenStreetMap pour Cities: Skylines II.
+extract_zoning.py — Pipeline d’extraction de zonage réel pour CS2.
 
 Exemples :
     python extract_zoning.py --bbox "48.766147,2.161560,48.945053,2.485657" --city "Paris"
@@ -9,12 +9,9 @@ Exemples :
 
 import argparse
 import json
-import re
-import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-from country_codes import UnknownCountryCodeError, resolve_country_code
 from overpass_client import build_paths_query, build_roads_query, query_with_retry
 from classifiers import (
     classify_commercial,
@@ -52,135 +49,6 @@ PATH_TAG_KEYS = (
     "bicycle",
     "sidewalk",
 )
-
-
-
-WATER_TAG_KEYS = (
-    "waterway",
-    "natural",
-    "water",
-    "landuse",
-    "name",
-    "intermittent",
-    "seasonal",
-    "tunnel",
-    "bridge",
-)
-
-
-def strip_bundle_accents(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value)
-    return "".join(char for char in normalized if not unicodedata.combining(char))
-
-
-def slugify_bundle_part(value: str, fallback: str) -> str:
-    ascii_value = strip_bundle_accents(value).lower()
-    slug = re.sub(r"[^a-z0-9]+", "_", ascii_value).strip("_")
-    slug = re.sub(r"_+", "_", slug)
-    return slug or fallback
-
-
-def sanitize_bundle_id(value: str) -> str:
-    normalized = strip_bundle_accents(value).lower()
-    bundle_id = re.sub(r"[^a-z0-9_.-]+", "_", normalized).strip("_")
-    bundle_id = re.sub(r"_+", "_", bundle_id)
-    return bundle_id or "bundle"
-
-
-def bundle_country_slug(country: str, country_code: str | None) -> str:
-    try:
-        return resolve_country_code(country_code, country)
-    except UnknownCountryCodeError as exc:
-        raise SystemExit(f"[ERREUR] {exc}") from exc
-
-
-def build_bundle_id(
-    *,
-    city: str,
-    country: str,
-    country_code: str | None,
-    center_lon: float,
-    center_lat: float,
-    explicit_bundle_id: str | None,
-) -> str:
-    if explicit_bundle_id:
-        return sanitize_bundle_id(explicit_bundle_id)
-
-    city_part = slugify_bundle_part(city, "city")
-    country_part = bundle_country_slug(country, country_code)
-
-    return f"{city_part}_{country_part}_{center_lat:.6f}_{center_lon:.6f}"
-
-
-def bbox_center_lon_lat(bbox: str) -> tuple[float, float]:
-    try:
-        south, west, north, east = [float(part.strip()) for part in bbox.split(",")]
-    except ValueError as exc:
-        raise SystemExit(f"[ERREUR] BBOX invalide : {bbox}") from exc
-
-    return ((west + east) / 2.0, (south + north) / 2.0)
-
-
-def build_bundle_geojson_pack_dir(
-    *,
-    bundle_root: str,
-    bundle_id: str,
-) -> Path:
-    project_root = Path(__file__).resolve().parent.parent
-    return project_root / bundle_root.strip("\\/") / bundle_id / "geojson_pack"
-
-
-def build_water_lines_query(bbox: str) -> str:
-    return f"""
-[out:json][timeout:180];
-(
-  way["waterway"~"^(river|stream|canal|drain|ditch)$"]({bbox});
-);
-out tags geom;
-"""
-
-
-def build_water_areas_query(bbox: str) -> str:
-    return f"""
-[out:json][timeout:180];
-(
-  way["natural"="water"]({bbox});
-  relation["natural"="water"]({bbox});
-  way["water"]({bbox});
-  relation["water"]({bbox});
-  way["landuse"~"^(reservoir|basin)$"]({bbox});
-  relation["landuse"~"^(reservoir|basin)$"]({bbox});
-  way["waterway"="riverbank"]({bbox});
-  relation["waterway"="riverbank"]({bbox});
-);
-out tags geom;
-"""
-
-
-def extract_water_tags(tags: dict) -> dict:
-    return {
-        key: tags[key]
-        for key in WATER_TAG_KEYS
-        if tags.get(key) is not None and str(tags.get(key)).strip() != ""
-    }
-
-
-def classify_water_area(tags: dict) -> str:
-    if tags.get("water"):
-        return str(tags.get("water"))
-    if tags.get("natural") == "water":
-        return "water"
-    if tags.get("landuse"):
-        return str(tags.get("landuse"))
-    if tags.get("waterway"):
-        return str(tags.get("waterway"))
-    return "water"
-
-
-def classify_water_line(tags: dict) -> str:
-    if tags.get("waterway"):
-        return str(tags.get("waterway"))
-    return "waterway"
 
 
 def coords_from_way(element: dict) -> list | None:
@@ -238,83 +106,6 @@ def extract_path_tags(tags: dict) -> dict:
         if tags.get(key) is not None and str(tags.get(key)).strip() != ""
     }
 
-
-def parse_osm_bool(value) -> bool:
-    if value is None:
-        return False
-
-    text = str(value).strip().lower()
-    return text in {"yes", "true", "1"}
-
-
-def parse_road_lanes(value) -> int | None:
-    if value is None:
-        return None
-
-    text = str(value).strip().replace(",", ".")
-
-    if not text:
-        return None
-
-    first_value = re.split(r"[;|/]", text)[0].strip()
-
-    try:
-        parsed = int(float(first_value))
-    except (TypeError, ValueError):
-        return None
-
-    return parsed if parsed > 0 else None
-
-
-def infer_road_lanes(highway: str, subcategory: str) -> int:
-    highway = str(highway or "").strip().lower()
-    subcategory = str(subcategory or "").strip().lower()
-
-    if highway in {"motorway", "trunk"}:
-        return 4
-
-    if highway in {"primary", "secondary", "tertiary"}:
-        return 2
-
-    if highway.endswith("_link") or subcategory == "highway ramp":
-        return 1
-
-    if highway in {"residential", "unclassified", "living_street", "road"}:
-        return 2
-
-    if highway == "service":
-        return 1
-
-    return 1
-
-
-def build_road_import_metadata(tags: dict, classification: dict) -> dict:
-    highway = str(tags.get("highway") or "").strip().lower()
-    subcategory = classification.get("subcategory", "Unknown Road")
-    explicit_lanes = parse_road_lanes(tags.get("lanes"))
-    target_lanes = explicit_lanes or infer_road_lanes(highway, subcategory)
-    oneway = parse_osm_bool(tags.get("oneway")) or highway == "motorway" or subcategory == "Highway Ramp"
-    is_roundabout = str(tags.get("junction") or "").strip().lower() == "roundabout"
-
-    return {
-        "schema": "road-import-v1",
-        "highway": highway,
-        "subcategory": subcategory,
-        "targetLaneCount": target_lanes,
-        "explicitLaneCount": explicit_lanes,
-        "inferredLaneCount": explicit_lanes is None,
-        "oneway": oneway,
-        "roundabout": is_roundabout,
-        "bridge": parse_osm_bool(tags.get("bridge")),
-        "tunnel": parse_osm_bool(tags.get("tunnel")),
-        "maxspeed": tags.get("maxspeed"),
-        "surface": tags.get("surface"),
-        "prefabHint": {
-            "category": subcategory,
-            "lanes": target_lanes,
-            "oneway": oneway,
-        },
-    }
 
 def parse_building_levels(value) -> int:
     if value is None:
@@ -563,22 +354,6 @@ def write_split_layers_pack(
     path_features = build_features(output.get("paths", []), "line")
     write_layer("paths.geojson", path_features, "LineString", base_layer=True)
 
-    water_line_features = build_features(output.get("water_lines", []), "line")
-    write_layer(
-        "water_lines_clipped.geojson",
-        water_line_features,
-        "LineString",
-        base_layer=True,
-    )
-
-    water_area_features = build_features(output.get("water_areas", []), "polygon")
-    write_layer(
-        "water_areas_clipped.geojson",
-        water_area_features,
-        "Polygon",
-        base_layer=True,
-    )
-
     write_geojson(geojson_dir / "all_features.geojson", base_features)
 
     layer_index["layers"].append({
@@ -605,7 +380,7 @@ def write_split_layers_pack(
         "layers": layer_index["layers"],
         "notes": [
             "Les coordonnées GeoJSON sont exportées en ordre standard [longitude, latitude].",
-            "Les fichiers water_lines_clipped.geojson et water_areas_clipped.geojson sont produits depuis les tags OSM waterway/natural/water/landuse.",
+            "Les fichiers water_lines_clipped.geojson et water_areas_clipped.geojson ne sont pas encore produits par extract_zoning.py.",
         ],
     }
 
@@ -630,73 +405,35 @@ def main():
         help="Nom de la ville ou zone extraite.",
     )
     parser.add_argument(
+        "--out",
+        default=None,
+        help="Chemin optionnel du fichier JavaScript legacy g?n?r?. Exemple : ./visualizer/zoning_data.js",
+    )
+
+    parser.add_argument(
         "--out-dir",
         default=None,
-        help="Dossier de sortie du pack GeoJSON scindé. Exemple : ../exports/zone-cs2",
-    )
-    parser.add_argument(
-        "--bundle-output",
-        action="store_true",
-        help="Exporte le pack GeoJSON dans exports/bundles/<bundle_id>/geojson_pack.",
-    )
-    parser.add_argument(
-        "--bundle-root",
-        default="exports/bundles",
-        help="Dossier racine des bundles si --bundle-output est actif.",
-    )
-    parser.add_argument(
-        "--bundle-id",
-        default=None,
-        help="Identifiant du bundle. Si absent, il est généré depuis ville/pays/centre bbox.",
-    )
-    parser.add_argument(
-        "--country",
-        default="",
-        help="Pays utilisé pour générer le bundle_id si --bundle-output est actif.",
-    )
-    parser.add_argument(
-        "--country-code",
-        default=None,
-        help="Code pays court utilisé pour générer le bundle_id si --bundle-output est actif.",
+        help="Dossier de sortie du pack GeoJSON scind?. Exemple : ../exports/zone-cs2",
     )
     parser.add_argument(
         "--split-layers",
         action="store_true",
-        help="Conservé pour compatibilité CLI ; le pack GeoJSON est toujours scindé par type.",
+        help="Exporte aussi les couches GeoJSON s?par?es par type.",
     )
 
     args = parser.parse_args()
 
     bbox = args.bbox
     city = args.city
-    if args.bundle_output:
-        center_lon, center_lat = bbox_center_lon_lat(bbox)
-        bundle_id = build_bundle_id(
-            city=city,
-            country=args.country,
-            country_code=args.country_code,
-            center_lon=center_lon,
-            center_lat=center_lat,
-            explicit_bundle_id=args.bundle_id,
-        )
-        pack_dir = build_bundle_geojson_pack_dir(
-            bundle_root=args.bundle_root,
-            bundle_id=bundle_id,
-        )
-    else:
-        bundle_id = None
-        pack_dir = Path(args.out_dir) if args.out_dir else default_pack_dir(city)
-
+    out_path = Path(args.out) if args.out else None
+    pack_dir = Path(args.out_dir) if args.out_dir else default_pack_dir(city)
     queries = build_queries(bbox)
 
-    print("CS2 Realmap Generator - extraction OpenStreetMap")
+    print("Extracteur de zonage réel pour CS2 v1.0")
     print(f"Ville / zone : {city}")
     print(f"BBOX         : {bbox}")
-    if args.bundle_output:
-        print(f"Bundle ID    : {bundle_id}")
-        print(f"Bundle root  : {args.bundle_root}")
     print(f"Pack exports : {pack_dir}")
-    print()
+    print(f"Legacy JS    : {out_path if out_path else 'd?sactiv?'}\n")
 
     print("[1/4] Construction de l’index de densité résidentielle...")
     bld_data = query_with_retry(queries["buildings_levels"], "buildings_levels")
@@ -728,26 +465,14 @@ def main():
     raw["paths"] = paths_data.get("elements", [])
     print(f"      paths: {len(raw['paths'])} éléments")
 
-    water_lines_data = query_with_retry(build_water_lines_query(bbox), "water_lines")
-    raw["water_lines"] = water_lines_data.get("elements", [])
-    print(f"      water_lines: {len(raw['water_lines'])} éléments")
-
-    water_areas_data = query_with_retry(build_water_areas_query(bbox), "water_areas")
-    raw["water_areas"] = water_areas_data.get("elements", [])
-    print(f"      water_areas: {len(raw['water_areas'])} éléments")
-
     print("\n[4/4] Classification des zones, routes et chemins...")
 
     output: dict[str, list] = {cat: [] for cat in zone_categories}
     output["roads"] = []
     output["paths"] = []
-    output["water_lines"] = []
-    output["water_areas"] = []
     skipped = 0
     skipped_roads = 0
     skipped_paths = 0
-    skipped_water_lines = 0
-    skipped_water_areas = 0
     commercial_ids: set[int] = set()
 
     for el in raw["commercial"]:
@@ -884,7 +609,6 @@ def main():
             continue
 
         classification = classify_road(tags)
-        road_tags = extract_road_tags(tags)
 
         output["roads"].append({
             "id": el.get("id"),
@@ -894,8 +618,7 @@ def main():
             "sourceTag": classification["sourceTag"],
             "confidence": classification["confidence"],
             "coords": coords,
-            "tags": road_tags,
-            "roadImport": build_road_import_metadata(road_tags, classification),
+            "tags": extract_road_tags(tags),
         })
 
     for el in raw["paths"]:
@@ -919,48 +642,6 @@ def main():
             "tags": extract_path_tags(tags),
         })
 
-    for el in raw["water_lines"]:
-        tags = el.get("tags") or {}
-        coords = extract_line_coords(el)
-
-        if not coords:
-            skipped_water_lines += 1
-            continue
-
-        subtype = classify_water_line(tags)
-
-        output["water_lines"].append({
-            "id": el.get("id"),
-            "name": tags.get("name") or "Néant",
-            "category": "Water",
-            "subcategory": subtype,
-            "sourceTag": tags.get("waterway") or "",
-            "confidence": 1.0,
-            "coords": coords,
-            "tags": extract_water_tags(tags),
-        })
-
-    for el in raw["water_areas"]:
-        tags = el.get("tags") or {}
-        coords = extract_coords(el)
-
-        if not coords:
-            skipped_water_areas += 1
-            continue
-
-        subtype = classify_water_area(tags)
-
-        output["water_areas"].append({
-            "id": el.get("id"),
-            "name": tags.get("name") or "Néant",
-            "category": "Water",
-            "subcategory": subtype,
-            "sourceTag": tags.get("water") or tags.get("natural") or tags.get("landuse") or tags.get("waterway") or "",
-            "confidence": 1.0,
-            "coords": coords,
-            "tags": extract_water_tags(tags),
-        })
-
     total = sum(len(v) for v in output.values())
     res = output["residential"]
     com = output["commercial"]
@@ -981,13 +662,9 @@ def main():
 
     print(f"  Routes récupérées          : {len(roads)}")
     print(f"  Chemins/piéton récupérés   : {len(paths)}")
-    print(f"  Lignes d’eau récupérées    : {len(output['water_lines'])}")
-    print(f"  Zones d’eau récupérées     : {len(output['water_areas'])}")
     print(f"  Ignorés sans géométrie     : {skipped}")
     print(f"  Routes ignorées sans géom. : {skipped_roads}")
     print(f"  Chemins ignorés sans géom. : {skipped_paths}")
-    print(f"  Lignes eau sans géom.      : {skipped_water_lines}")
-    print(f"  Zones eau sans géom.       : {skipped_water_areas}")
     print(f"  TOTAL                      : {total}")
 
     ts = datetime.now(timezone.utc).isoformat()
@@ -999,7 +676,7 @@ def main():
         "skippedPathsWithoutGeometry": skipped_paths,
         "counts": {
             cat: len(output.get(cat, []))
-            for cat in zone_categories + ["roads", "paths", "water_lines", "water_areas"]
+            for cat in zone_categories + ["roads", "paths"]
         },
     }
 
@@ -1012,7 +689,28 @@ def main():
         report=split_report,
     )
 
-    print(f"\nPack GeoJSON scindé : {pack_dir}")
+    print(f"\nPack GeoJSON scind? : {pack_dir}")
+
+    if out_path is not None:
+        lines = [
+            f"// G?n?r? par extract_zoning.py ? {ts}",
+            f"// Ville / zone : {city}",
+            f"// BBOX : {bbox}",
+            f"// Total objets : {total}",
+            "",
+        ]
+
+        for cat in zone_categories + ["roads", "paths"]:
+            var = f"DATA_{cat.upper()}"
+            lines.append(f"const {var} = {json.dumps(output[cat], ensure_ascii=False)};")
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("\n".join(lines), encoding="utf-8")
+        size_mb = out_path.stat().st_size / (1024 * 1024)
+
+        print(f"Legacy JS g?n?r? : {out_path} ? {size_mb:.1f} MB ? {total} objets")
+    else:
+        print("Legacy JS : non g?n?r?. Utilise --out si tu veux encore produire zoning_data.js.")
 
 
 if __name__ == "__main__":

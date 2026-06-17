@@ -8,20 +8,9 @@ import sys
 import unicodedata
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-COUNTRY_CODE_ALIASES = {
-    "france": "fr",
-    "republique francaise": "fr",
-    "république française": "fr",
-    "china": "cn",
-    "chine": "cn",
-    "united states": "us",
-    "united states of america": "us",
-    "usa": "us",
-    "us": "us",
-    "etats unis": "us",
-    "états unis": "us",
-}
+from country_codes import UnknownCountryCodeError, resolve_country_code
 
 
 def load_contract(path: str | None) -> dict:
@@ -90,14 +79,10 @@ def sanitize_bundle_id(value: str) -> str:
 
 
 def country_slug(country: str, country_code: str | None) -> str:
-    if country_code:
-        return slugify(country_code, "xx")
-
-    key = slugify(country, "")
-    if key in COUNTRY_CODE_ALIASES:
-        return COUNTRY_CODE_ALIASES[key]
-
-    return slugify(country, "xx")
+    try:
+        return resolve_country_code(country_code, country)
+    except UnknownCountryCodeError as exc:
+        raise SystemExit(f"[ERREUR] {exc}") from exc
 
 
 def build_bundle_id(
@@ -326,7 +311,8 @@ def main() -> int:
             center_lat=center_lat,
             explicit_bundle_id=bundle_id,
         )
-        out_dir_str = f"{bundle_root_str.strip('\\/')}/{bundle_id}/png"
+        bundle_root_clean = bundle_root_str.strip("\\/")
+        out_dir_str = f"{bundle_root_clean}/{bundle_id}/png"
 
     provider = pick(
         args.provider,
@@ -554,4 +540,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
