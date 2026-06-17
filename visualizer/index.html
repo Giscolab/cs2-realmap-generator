@@ -208,13 +208,12 @@
         <div id="layer-controls" class="layer-list" role="list"></div>
       </section>
 
-      <section class="legend-section" aria-labelledby="legend-title">
+      <section class="services-section" aria-labelledby="services-title">
         <div class="section-heading">
-          <h2 id="legend-title">Légende CS2</h2>
-          <span class="section-meta">Couleurs de zonage</span>
+          <h2 id="services-title">Services</h2>
+          <span id="services-context" class="section-meta">Familles CityTimeline</span>
         </div>
-        <p class="legend-note">Chaque objet conserve ses données OSM et affiche le pinceau CS2 recommandé.</p>
-        <div id="legend-list" class="legend-list"></div>
+        <div id="services-list" class="services-list" aria-live="polite"></div>
       </section>
     </aside>
 
@@ -256,6 +255,7 @@
   <script src="./js/cs2-command-builder.js"></script>
   <script src="./js/cs2-map-helper.js"></script>
   <script src="./js/bundle-catalog-controller.js"></script>
+  <script src="./js/services-controller.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>

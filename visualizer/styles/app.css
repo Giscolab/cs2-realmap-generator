@@ -191,17 +191,10 @@ body.panel-collapsed .location-navigator {
 .app-header,
 .metrics-section,
 .controls-section,
-.cs2-helper-section,
-.legend-section {
+.cs2-helper-section {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: var(--space-4);
   margin-bottom: var(--space-4);
-}
-
-.legend-section {
-  border-bottom: 0;
-  padding-bottom: 0;
-  margin-bottom: 0;
 }
 
 .brand-block {
@@ -394,8 +387,7 @@ h2 {
   opacity: 0.58;
 }
 
-.layer-swatch,
-.legend-swatch {
+.layer-swatch {
   width: 12px;
   height: 12px;
   border: 1px solid rgba(255, 255, 255, 0.38);
@@ -433,18 +425,6 @@ h2 {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   text-align: right;
-}
-
-.legend-note {
-  margin-bottom: var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.45;
-}
-
-.legend-list {
-  display: grid;
-  gap: var(--space-2);
 }
 
 .cs2-helper-inputs {
@@ -627,15 +607,6 @@ h2 {
   border-color: rgba(88, 216, 255, 0.68);
   background: rgba(88, 216, 255, 0.15);
   outline: none;
-}
-
-.legend-item {
-  display: grid;
-  grid-template-columns: 12px 1fr;
-  gap: var(--space-2);
-  align-items: center;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
 }
 
 .panel-toggle {
@@ -936,4 +907,81 @@ body.panel-collapsed .dashboard-panel {
   overflow-x: auto;
   font-family: Consolas, "Cascadia Mono", monospace;
   line-height: 1.45;
+}
+
+/* --- Section services (familles CityTimeline) --- */
+.services-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.service-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-3);
+}
+
+.service-card.is-disabled {
+  opacity: 0.55;
+}
+
+.service-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.service-name {
+  flex: 1 1 auto;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.service-badge {
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.service-badge.is-on {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.service-badge.is-off {
+  color: var(--color-text-soft);
+}
+
+.service-count {
+  min-width: 2.5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.service-subs {
+  margin-top: var(--space-2);
+  display: grid;
+  gap: 2px;
+}
+
+.service-sub {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.service-sub-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.services-empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }

@@ -59,16 +59,6 @@
     return button;
   }
 
-  function createLegendItem(layer) {
-    var item = createElement("div", "legend-item");
-    var swatch = createElement("span", "legend-swatch");
-
-    item.style.setProperty("--layer-color", layer.color);
-    swatch.setAttribute("aria-hidden", "true");
-    item.append(swatch, createElement("span", "", layer.label));
-    return item;
-  }
-
   function createLayerIndex(dataset) {
     return dataset.layers.reduce(function (index, layerData) {
       index[layerData.definition.key] = layerData;
@@ -122,17 +112,6 @@
       );
     }
     updateVisibleCount(context.dataset);
-  }
-
-  function renderLegend(context) {
-    if (context.legendList) {
-      context.legendList.replaceChildren.apply(
-        context.legendList,
-        context.dataset.layers.map(function (layerData) {
-          return createLegendItem(layerData.definition);
-        })
-      );
-    }
   }
 
   function setLayerActive(context, layerData, active) {
@@ -202,7 +181,6 @@
     renderStatus(context);
     renderMetrics(context);
     renderLayers(context);
-    renderLegend(context);
     bindLayerControls(context);
     bindToolbar(context);
     bindPanelToggle(context);
@@ -216,7 +194,6 @@
       layersByKey: createLayerIndex(options.dataset),
       layerList: byId("layer-controls"),
       metricsGrid: byId("metrics-grid"),
-      legendList: byId("legend-list"),
       panelToggle: byId("panel-toggle")
     };
 

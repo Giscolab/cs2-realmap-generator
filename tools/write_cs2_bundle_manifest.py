@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from country_codes import UnknownCountryCodeError, resolve_country_code
+from service_families import SERVICE_FAMILIES
 
 
 def round_number(value: float, digits: int) -> float:
@@ -279,6 +280,8 @@ def build_manifest(args: argparse.Namespace) -> dict:
             "waterAreas": geojson_dir + "\\geojson\\water_areas_clipped.geojson",
             "layerIndex": geojson_dir + "\\reports\\layer_index.json",
             "extractionReport": geojson_dir + "\\reports\\extraction_report.json",
+            "servicesIndex": geojson_dir + "\\reports\\services_index.json",
+            "services": {fam["key"]: geojson_dir + "\\geojson\\services\\" + fam["key"] + ".geojson" for fam in SERVICE_FAMILIES},
         },
         "timelineMod": {
             "configPath": timeline_config_path,

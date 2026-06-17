@@ -179,12 +179,25 @@
           sources[layer.key] = layer.features;
         });
 
-        return {
-          mode: "pack",
-          indexPath: indexPath,
-          index: index,
-          sources: sources
-        };
+        var servicesIndexPath = getPackRoot(indexPath) + "reports/services_index.json";
+
+        return fetchJSON(servicesIndexPath).then(function (servicesIndex) {
+          return {
+            mode: "pack",
+            indexPath: indexPath,
+            index: index,
+            sources: sources,
+            servicesIndex: servicesIndex
+          };
+        }).catch(function () {
+          return {
+            mode: "pack",
+            indexPath: indexPath,
+            index: index,
+            sources: sources,
+            servicesIndex: null
+          };
+        });
       });
     });
   }

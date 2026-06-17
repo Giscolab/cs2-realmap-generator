@@ -118,6 +118,12 @@
       }) : null;
 
       panel.render();
+
+      if (App.ServicesController) {
+        App.ServicesController.create({
+          servicesIndex: packData ? packData.servicesIndex : null
+        }).render();
+      }
       showEmptyState(dataset);
       hideLoading();
 

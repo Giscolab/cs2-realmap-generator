@@ -24,6 +24,14 @@ from classifiers import (
     classify_road,
 )
 from cs2_zones import CS2_LABELS, EXAMPLE_BBOX_PARIS, build_queries
+from service_families import (
+    SERVICE_FAMILIES,
+    build_service_query,
+    classify_service_element,
+    service_point,
+    source_tag,
+    subcategory_labels,
+)
 
 
 ROAD_TAG_KEYS = (
@@ -615,6 +623,109 @@ def write_split_layers_pack(
     )
 
 
+def service_point_feature(item: dict) -> dict:
+    lat, lon = item["point"]
+    properties = {key: value for key, value in item.items() if key != "point"}
+    return {
+        "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [lon, lat]},
+        "properties": properties,
+    }
+
+
+def download_service_families(bbox: str) -> dict:
+    services: dict[str, list] = {}
+
+    for family in SERVICE_FAMILIES:
+        items: list = []
+        query = build_service_query(family, bbox)
+
+        if query is not None:
+            data = query_with_retry(query, f"service:{family['key']}")
+            sub_labels = subcategory_labels(family)
+            seen: set = set()
+
+            for el in data.get("elements", []):
+                tags = el.get("tags") or {}
+                subcategory = classify_service_element(family, tags)
+
+                if subcategory is None:
+                    continue
+
+                point = service_point(el)
+
+                if point is None:
+                    continue
+
+                key = (el.get("type"), el.get("id"))
+                if el.get("id") is not None and key in seen:
+                    continue
+                seen.add(key)
+
+                items.append({
+                    "id": el.get("id"),
+                    "type": el.get("type"),
+                    "name": tags.get("name") or "Néant",
+                    "family": family["key"],
+                    "familyLabel": family["label"],
+                    "subcategory": subcategory,
+                    "subcategoryLabel": sub_labels.get(subcategory, subcategory),
+                    "sourceTag": source_tag(family, tags),
+                    "point": point,
+                    "tags": {
+                        k: tags[k]
+                        for k in ("amenity", "leisure", "tourism", "office", "landuse", "emergency", "name")
+                        if tags.get(k)
+                    },
+                })
+
+        services[family["key"]] = items
+
+    return services
+
+
+def write_service_layers(out_dir: Path, services: dict, generated_at: str, bbox: str) -> dict:
+    reports_dir = out_dir / "reports"
+    families_report = []
+
+    for family in SERVICE_FAMILIES:
+        items = services.get(family["key"], [])
+        features = [service_point_feature(item) for item in items]
+        relative_path = f"geojson/services/{family['key']}.geojson"
+        write_geojson(out_dir / relative_path, features)
+
+        sub_counts = {sub["key"]: 0 for sub in family["subcategories"]}
+        for item in items:
+            sub_counts[item["subcategory"]] = sub_counts.get(item["subcategory"], 0) + 1
+
+        families_report.append({
+            "key": family["key"],
+            "label": family["label"],
+            "implemented": bool(family.get("implemented")),
+            "file": relative_path,
+            "geometryType": "Point",
+            "count": len(features),
+            "subcategories": [
+                {"key": sub["key"], "label": sub["label"], "count": sub_counts.get(sub["key"], 0)}
+                for sub in family["subcategories"]
+            ],
+        })
+
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    index = {
+        "generatedAt": generated_at,
+        "bbox": bbox,
+        "bboxOrder": "south,west,north,east",
+        "geometry": "Point (position du noeud, ou center Overpass pour way/relation)",
+        "families": families_report,
+    }
+    (reports_dir / "services_index.json").write_text(
+        json.dumps(index, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return index
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extrait les données de zonage OpenStreetMap pour Cities: Skylines II"
@@ -990,6 +1101,12 @@ def main():
     print(f"  Zones eau sans géom.       : {skipped_water_areas}")
     print(f"  TOTAL                      : {total}")
 
+    print("\n[Services] Téléchargement des familles de services...")
+    services = download_service_families(bbox)
+    for family_def in SERVICE_FAMILIES:
+        service_count = len(services.get(family_def["key"], []))
+        print(f"      {family_def['label']:<42}: {service_count}")
+
     ts = datetime.now(timezone.utc).isoformat()
 
     split_report = {
@@ -1011,6 +1128,15 @@ def main():
         generated_at=ts,
         report=split_report,
     )
+
+    services_index = write_service_layers(
+        out_dir=pack_dir,
+        services=services,
+        generated_at=ts,
+        bbox=bbox,
+    )
+    service_total = sum(family["count"] for family in services_index["families"])
+    print(f"\n  Services (points) récupérés : {service_total}")
 
     print(f"\nPack GeoJSON scindé : {pack_dir}")
 
