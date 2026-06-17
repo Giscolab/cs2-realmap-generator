@@ -12,11 +12,9 @@ surfaces (way/relation). On extrait donc UN POINT représentatif par élément :
 
 État d'implémentation
 ---------------------
-Chaque famille porte un drapeau `implemented`. Une famille `implemented=False`
-est déclarée (pour que le contrat HUD soit complet et cohérent) mais ne possède
-pas encore de sélecteurs OSM : l'extraction renvoie alors 0 élément — ce qui
-correspond à l'état « non connecté / import désactivé » du HUD, désormais
-intentionnel et documenté plutôt que contradictoire.
+Chaque famille porte un drapeau `implemented`. Les 9 familles du HUD sont
+connectées au pipeline ; certaines sous-catégories restent volontairement sans
+sélecteur quand OSM ne les distingue pas de manière fiable.
 
 La classification reste heuristique : OSM ne distingue pas toujours finement les
 sous-catégories (ex. école primaire vs collège). On mappe ce qu'OSM fournit de
@@ -92,39 +90,63 @@ SERVICE_FAMILIES: list[dict] = [
         ],
     },
 
-    # --- Familles déclarées mais pas encore extraites (sélecteurs vides) ---
-    {"key": "electricity", "label": "Électricité", "implemented": False, "subcategories": [
-        {"key": "generation", "label": "Production électrique", "selectors": []},
-        {"key": "transformation", "label": "Transformation", "selectors": []},
-        {"key": "storage", "label": "Stockage", "selectors": []},
-        {"key": "grid", "label": "Réseau électrique", "selectors": []},
+    {"key": "electricity", "label": "Électricité", "implemented": True, "subcategories": [
+        {"key": "generation", "label": "Production électrique",
+         "selectors": [{"power": ["plant", "generator"]}]},
+        {"key": "transformation", "label": "Transformation",
+         "selectors": [{"power": ["substation", "transformer"]}]},
+        {"key": "storage", "label": "Stockage",
+         "selectors": [{"power": ["storage"]}]},
+        {"key": "grid", "label": "Réseau électrique",
+         "selectors": [{"power": ["line", "minor_line", "cable", "tower", "pole", "portal"]}]},
     ]},
-    {"key": "waste", "label": "Gestion des déchets", "implemented": False, "subcategories": [
-        {"key": "collection", "label": "Collecte", "selectors": []},
-        {"key": "recycling", "label": "Recyclage", "selectors": []},
-        {"key": "treatment", "label": "Traitement", "selectors": []},
-        {"key": "landfill", "label": "Décharge / stockage", "selectors": []},
+    {"key": "waste", "label": "Gestion des déchets", "implemented": True, "subcategories": [
+        {"key": "collection", "label": "Collecte",
+         "selectors": [{"amenity": ["waste_disposal", "waste_transfer_station"]}]},
+        {"key": "recycling", "label": "Recyclage",
+         "selectors": [{"amenity": ["recycling"]}]},
+        {"key": "treatment", "label": "Traitement",
+         "selectors": [{"man_made": ["incinerator", "wastewater_plant"]}]},
+        {"key": "landfill", "label": "Décharge / stockage",
+         "selectors": [{"landuse": ["landfill"]}]},
     ]},
-    {"key": "transport", "label": "Transports", "implemented": False, "subcategories": [
-        {"key": "bus", "label": "Bus", "selectors": []},
-        {"key": "tram", "label": "Tram", "selectors": []},
-        {"key": "train", "label": "Train", "selectors": []},
-        {"key": "metro", "label": "Métro", "selectors": []},
-        {"key": "taxi", "label": "Taxi", "selectors": []},
-        {"key": "air", "label": "Aérien", "selectors": []},
-        {"key": "maritime", "label": "Maritime", "selectors": []},
+    {"key": "transport", "label": "Transports", "implemented": True, "subcategories": [
+        {"key": "bus", "label": "Bus",
+         "selectors": [{"highway": ["bus_stop"]}, {"amenity": ["bus_station"]}]},
+        {"key": "tram", "label": "Tram",
+         "selectors": [{"railway": ["tram_stop"]}]},
+        {"key": "train", "label": "Train",
+         "selectors": [{"railway": ["station", "halt"]}]},
+        {"key": "metro", "label": "Métro",
+         "selectors": [{"railway": ["subway_entrance"]}, {"station": ["subway"]}]},
+        {"key": "taxi", "label": "Taxi",
+         "selectors": [{"amenity": ["taxi"]}]},
+        {"key": "air", "label": "Aérien",
+         "selectors": [{"aeroway": ["aerodrome", "terminal", "helipad"]}]},
+        {"key": "maritime", "label": "Maritime",
+         "selectors": [{"amenity": ["ferry_terminal"]}]},
     ]},
-    {"key": "water", "label": "Eau et égouts", "implemented": False, "subcategories": [
-        {"key": "pumping", "label": "Pompage", "selectors": []},
-        {"key": "water_treatment", "label": "Traitement de l'eau", "selectors": []},
-        {"key": "sewage", "label": "Égouts", "selectors": []},
-        {"key": "wastewater", "label": "Traitement des eaux usées", "selectors": []},
+    {"key": "water", "label": "Eau et égouts", "implemented": True, "subcategories": [
+        {"key": "pumping", "label": "Pompage",
+         "selectors": [{"man_made": ["pump", "pumping_station", "water_tower", "water_well"]}]},
+        {"key": "water_treatment", "label": "Traitement de l'eau",
+         "selectors": [{"man_made": ["water_works"]}]},
+        {"key": "sewage", "label": "Égouts",
+         "selectors": [{"waterway": ["drain", "ditch"]}, {"man_made": ["sewer"]}]},
+        {"key": "wastewater", "label": "Traitement des eaux usées",
+         "selectors": [{"man_made": ["wastewater_plant"]}]},
     ]},
-    {"key": "communications", "label": "Communications", "implemented": False, "subcategories": [
-        {"key": "post", "label": "Poste", "selectors": []},
-        {"key": "telecom", "label": "Télécommunications", "selectors": []},
-        {"key": "datacenter", "label": "Serveurs / data center", "selectors": []},
-        {"key": "radio", "label": "Radio / antennes", "selectors": []},
+    {"key": "communications", "label": "Communications", "implemented": True, "subcategories": [
+        {"key": "post", "label": "Poste",
+         "selectors": [{"amenity": ["post_office"]}]},
+        {"key": "telecom", "label": "Télécommunications",
+         "selectors": [{"telecom": ["exchange", "service_device", "connection_point"]},
+                       {"man_made": ["telephone_exchange", "telecommunication_tower"]}]},
+        {"key": "datacenter", "label": "Serveurs / data center",
+         "selectors": [{"building": ["data_center"]}, {"man_made": ["data_center"]}, {"telecom": ["data_center"]}]},
+        {"key": "radio", "label": "Radio / antennes",
+         "selectors": [{"man_made": ["antenna", "communications_tower", "mast"]},
+                       {"tower:type": ["communication"]}]},
     ]},
 ]
 
@@ -148,8 +170,8 @@ def build_service_query(family: dict, bbox: str, timeout: int = 120) -> str | No
     """
     Construit la requête Overpass d'une famille (nœuds + ways + relations).
 
-    Renvoie None si la famille n'a aucun sélecteur (non implémentée) : il n'y a
-    alors rien à télécharger.
+    Renvoie None si la famille n'a aucun sélecteur exploitable : il n'y a alors
+    rien à télécharger.
     """
     pairs = _selector_pairs(family)
     if not pairs:

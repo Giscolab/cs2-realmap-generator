@@ -28,9 +28,19 @@ def test_nine_families_declared() -> None:
     assert len(SERVICE_FAMILIES) == 9
 
 
-def test_four_families_implemented() -> None:
+def test_all_families_implemented() -> None:
     keys = {f["key"] for f in implemented_families()}
-    assert keys == {"education", "fire", "medical", "parks"}
+    assert keys == {
+        "communications",
+        "education",
+        "electricity",
+        "fire",
+        "medical",
+        "parks",
+        "transport",
+        "waste",
+        "water",
+    }
 
 
 def test_query_builder_emits_node_way_relation_and_center() -> None:
@@ -50,8 +60,19 @@ def test_query_builder_merges_subcategory_selectors() -> None:
     assert 'landuse"~"^(cemetery)$"' in q
 
 
-def test_unimplemented_family_has_no_query() -> None:
-    assert build_service_query(family("electricity"), "0,0,1,1") is None
+@pytest.mark.parametrize("family_key", [
+    "communications",
+    "education",
+    "electricity",
+    "fire",
+    "medical",
+    "parks",
+    "transport",
+    "waste",
+    "water",
+])
+def test_all_families_have_query(family_key) -> None:
+    assert build_service_query(family(family_key), "0,0,1,1") is not None
 
 
 @pytest.mark.parametrize("tags,expected", [
@@ -81,6 +102,59 @@ def test_classify_parks_order_is_deterministic() -> None:
     assert classify_service_element(family("parks"), {"leisure": "park"}) == "local_park"
     assert classify_service_element(family("parks"), {"leisure": "stadium"}) == "sport"
     assert classify_service_element(family("parks"), {"tourism": "museum"}) == "tourism"
+
+
+@pytest.mark.parametrize("tags,expected", [
+    ({"power": "plant"}, "generation"),
+    ({"power": "substation"}, "transformation"),
+    ({"power": "storage"}, "storage"),
+    ({"power": "tower"}, "grid"),
+])
+def test_classify_electricity(tags, expected) -> None:
+    assert classify_service_element(family("electricity"), tags) == expected
+
+
+@pytest.mark.parametrize("tags,expected", [
+    ({"amenity": "waste_disposal"}, "collection"),
+    ({"amenity": "recycling"}, "recycling"),
+    ({"man_made": "incinerator"}, "treatment"),
+    ({"landuse": "landfill"}, "landfill"),
+])
+def test_classify_waste(tags, expected) -> None:
+    assert classify_service_element(family("waste"), tags) == expected
+
+
+@pytest.mark.parametrize("tags,expected", [
+    ({"highway": "bus_stop"}, "bus"),
+    ({"railway": "tram_stop"}, "tram"),
+    ({"railway": "station"}, "train"),
+    ({"railway": "subway_entrance"}, "metro"),
+    ({"amenity": "taxi"}, "taxi"),
+    ({"aeroway": "aerodrome"}, "air"),
+    ({"amenity": "ferry_terminal"}, "maritime"),
+])
+def test_classify_transport(tags, expected) -> None:
+    assert classify_service_element(family("transport"), tags) == expected
+
+
+@pytest.mark.parametrize("tags,expected", [
+    ({"man_made": "pumping_station"}, "pumping"),
+    ({"man_made": "water_works"}, "water_treatment"),
+    ({"waterway": "drain"}, "sewage"),
+    ({"man_made": "wastewater_plant"}, "wastewater"),
+])
+def test_classify_water(tags, expected) -> None:
+    assert classify_service_element(family("water"), tags) == expected
+
+
+@pytest.mark.parametrize("tags,expected", [
+    ({"amenity": "post_office"}, "post"),
+    ({"telecom": "exchange"}, "telecom"),
+    ({"building": "data_center"}, "datacenter"),
+    ({"tower:type": "communication"}, "radio"),
+])
+def test_classify_communications(tags, expected) -> None:
+    assert classify_service_element(family("communications"), tags) == expected
 
 
 def test_service_point_from_node() -> None:

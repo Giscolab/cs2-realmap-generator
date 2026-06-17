@@ -931,6 +931,7 @@ body.panel-collapsed .dashboard-panel {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .service-name {
@@ -962,6 +963,28 @@ body.panel-collapsed .dashboard-panel {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: var(--color-text);
+}
+
+.service-toggle {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.service-toggle:hover:not(:disabled),
+.service-toggle.is-active {
+  border-color: rgba(88, 216, 255, 0.58);
+  background: rgba(88, 216, 255, 0.14);
+}
+
+.service-toggle:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .service-subs {

@@ -121,7 +121,9 @@
 
       if (App.ServicesController) {
         App.ServicesController.create({
-          servicesIndex: packData ? packData.servicesIndex : null
+          servicesIndex: packData ? packData.servicesIndex : null,
+          map: mapController.map,
+          packIndexPath: packData ? packData.indexPath : ""
         }).render();
       }
       showEmptyState(dataset);
