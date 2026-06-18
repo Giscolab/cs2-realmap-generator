@@ -117,6 +117,11 @@
         packData: packData
       }) : null;
 
+      var overlayExporter = App.OverlayExporter ? App.OverlayExporter.create({
+        map: mapController.map,
+        packIndexPath: packData ? packData.indexPath : ""
+      }) : null;
+
       panel.render();
 
       if (App.ServicesController) {
@@ -135,6 +140,7 @@
         mapController: mapController,
         overlayController: overlayController,
         cs2MapHelper: cs2MapHelper,
+        overlayExporter: overlayExporter,
         packData: packData
       };
 

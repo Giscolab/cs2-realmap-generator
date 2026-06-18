@@ -1,4 +1,4 @@
-﻿(function (App) {
+(function (App) {
   "use strict";
 
   var SOURCE_READERS = {
@@ -29,6 +29,31 @@
     DATA_PATHS: function () {
       return typeof DATA_PATHS === "undefined" ? [] : DATA_PATHS;
     }
+  };
+
+  var ROAD_CATEGORY_BY_HIGHWAY = {
+    motorway: "highway",
+    trunk: "highway",
+    primary: "large_road",
+    secondary: "medium_road",
+    tertiary: "small_road",
+    residential: "small_road",
+    living_street: "small_road",
+    motorway_link: "ramp",
+    trunk_link: "ramp",
+    primary_link: "ramp",
+    secondary_link: "ramp",
+    tertiary_link: "ramp",
+    pedestrian: "pathway",
+    footway: "pathway",
+    path: "pathway",
+    steps: "pathway",
+    cycleway: "pathway",
+    bridleway: "pathway",
+    unclassified: "gravel_road",
+    service: "gravel_road",
+    road: "gravel_road",
+    track: "gravel_road"
   };
 
   function toArray(value) {
@@ -101,7 +126,61 @@
       return false;
     }
 
+    if (layer.roadCategory && classifyFeatureRoadCategory(feature) !== layer.roadCategory) {
+      return false;
+    }
+
     return true;
+  }
+
+  function highwayFromSourceTag(value) {
+    var match = String(value || "").match(/^highway=([^;,\s]+)/i);
+    return match ? match[1].toLowerCase() : "";
+  }
+
+  function classifyFeatureRoadCategory(feature) {
+    if (feature && feature.roadCategory) {
+      return feature.roadCategory;
+    }
+
+    var tags = feature && feature.tags && typeof feature.tags === "object" ? feature.tags : {};
+    var highway = String(tags.highway || highwayFromSourceTag(feature && feature.sourceTag)).toLowerCase();
+    return ROAD_CATEGORY_BY_HIGHWAY[highway] || "gravel_road";
+  }
+
+  function roadIndexByCategory(packData) {
+    var categories = packData &&
+      packData.roadsIndex &&
+      Array.isArray(packData.roadsIndex.categories)
+      ? packData.roadsIndex.categories
+      : [];
+
+    return categories.reduce(function (index, category) {
+      if (category && category.key) {
+        index[category.key] = category;
+      }
+      return index;
+    }, {});
+  }
+
+  function validColor(value) {
+    var color = String(value || "").trim();
+    return /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : "";
+  }
+
+  function applyRoadContract(layer, roadsIndex) {
+    if (!layer.roadCategory || !roadsIndex[layer.roadCategory]) {
+      return layer;
+    }
+
+    var category = roadsIndex[layer.roadCategory];
+    var color = validColor(category.color);
+
+    return Object.assign({}, layer, {
+      label: category.label || layer.label,
+      color: color || layer.color,
+      stroke: color || layer.stroke || layer.color
+    });
   }
 
   function minimumCoordCount(layer) {
@@ -136,7 +215,9 @@
       }
     });
 
-    var layers = config.layers.map(function (layer) {
+    var roadsIndex = roadIndexByCategory(packData);
+    var layers = config.layers.map(function (baseLayer) {
+      var layer = applyRoadContract(baseLayer, roadsIndex);
       var source = sources[layer.source] || { features: [], count: 0 };
 
       var rawFeatures = source.features.filter(function (feature) {
@@ -152,9 +233,18 @@
 
         extendBounds(bounds, coords);
 
+        var featureForLayer = feature;
+
+        if (layer.roadCategory && !featureForLayer.roadColor) {
+          featureForLayer = Object.assign({}, feature, {
+            roadCategory: classifyFeatureRoadCategory(feature),
+            roadColor: layer.color
+          });
+        }
+
         return {
           layer: layer,
-          feature: feature,
+          feature: featureForLayer,
           coords: coords
         };
       }).filter(Boolean);

@@ -2,7 +2,7 @@
   "use strict";
 
   function chooseFeatureColor(feature, fallback) {
-    var value = App.SafeHTML.safeText(feature.color);
+    var value = App.SafeHTML.safeText(feature.roadColor || feature.color);
     if (/^#[0-9a-fA-F]{3,8}$/.test(value)) {
       return value;
     }

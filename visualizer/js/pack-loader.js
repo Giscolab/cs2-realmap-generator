@@ -179,23 +179,25 @@
           sources[layer.key] = layer.features;
         });
 
-        var servicesIndexPath = getPackRoot(indexPath) + "reports/services_index.json";
+        var packRoot = getPackRoot(indexPath);
+        var servicesIndexPath = packRoot + "reports/services_index.json";
+        var roadsIndexPath = packRoot + "reports/roads_index.json";
 
-        return fetchJSON(servicesIndexPath).then(function (servicesIndex) {
+        return Promise.all([
+          fetchJSON(servicesIndexPath).catch(function () {
+            return null;
+          }),
+          fetchJSON(roadsIndexPath).catch(function () {
+            return null;
+          })
+        ]).then(function (indexes) {
           return {
             mode: "pack",
             indexPath: indexPath,
             index: index,
             sources: sources,
-            servicesIndex: servicesIndex
-          };
-        }).catch(function () {
-          return {
-            mode: "pack",
-            indexPath: indexPath,
-            index: index,
-            sources: sources,
-            servicesIndex: null
+            servicesIndex: indexes[0],
+            roadsIndex: indexes[1]
           };
         });
       });

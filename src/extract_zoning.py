@@ -24,6 +24,12 @@ from classifiers import (
     classify_road,
 )
 from cs2_zones import CS2_LABELS, EXAMPLE_BBOX_PARIS, build_queries
+from road_categories import (
+    ROAD_CATEGORIES,
+    classify_road_category,
+    road_category_color,
+    road_category_label,
+)
 from service_families import (
     SERVICE_FAMILIES,
     build_service_query,
@@ -568,6 +574,25 @@ def write_split_layers_pack(
         base_layer=False,
     )
 
+    road_category_layers = []
+    for road_category in ROAD_CATEGORIES:
+        if road_category["key"] == "pathway":
+            continue
+        category_items = [
+            item for item in road_items
+            if item.get("roadCategory") == road_category["key"]
+        ]
+        category_features = build_features(category_items, "line")
+        category_file = f"roads_{road_category['key']}.geojson"
+        write_layer(category_file, category_features, "LineString", base_layer=False)
+        road_category_layers.append({
+            "key": road_category["key"],
+            "label": road_category["label"],
+            "color": road_category["color"],
+            "file": f"geojson/{category_file}",
+            "count": len(category_features),
+        })
+
     path_features = build_features(output.get("paths", []), "line")
     write_layer("paths.geojson", path_features, "LineString", base_layer=True)
 
@@ -619,6 +644,25 @@ def write_split_layers_pack(
 
     (reports_dir / "extraction_report.json").write_text(
         json.dumps(extraction_report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    road_category_layers.append({
+        "key": "pathway",
+        "label": road_category_label("pathway"),
+        "color": road_category_color("pathway"),
+        "file": "geojson/paths.geojson",
+        "count": len(path_features),
+    })
+
+    roads_index = {
+        "generatedAt": generated_at,
+        "bbox": bbox,
+        "bboxOrder": "south,west,north,east",
+        "categories": road_category_layers,
+    }
+    (reports_dir / "roads_index.json").write_text(
+        json.dumps(roads_index, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -996,6 +1040,7 @@ def main():
 
         classification = classify_road(tags)
         road_tags = extract_road_tags(tags)
+        road_category = classify_road_category(tags)
 
         output["roads"].append({
             "id": el.get("id"),
@@ -1006,6 +1051,8 @@ def main():
             "confidence": classification["confidence"],
             "coords": coords,
             "tags": road_tags,
+            "roadCategory": road_category,
+            "roadColor": road_category_color(road_category),
             "roadImport": build_road_import_metadata(road_tags, classification),
         })
 
@@ -1028,6 +1075,8 @@ def main():
             "confidence": classification["confidence"],
             "coords": coords,
             "tags": extract_path_tags(tags),
+            "roadCategory": "pathway",
+            "roadColor": road_category_color("pathway"),
         })
 
     for el in raw["water_lines"]:

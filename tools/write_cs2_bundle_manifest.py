@@ -280,6 +280,7 @@ def build_manifest(args: argparse.Namespace) -> dict:
             "waterAreas": geojson_dir + "\\geojson\\water_areas_clipped.geojson",
             "layerIndex": geojson_dir + "\\reports\\layer_index.json",
             "extractionReport": geojson_dir + "\\reports\\extraction_report.json",
+            "roadsIndex": geojson_dir + "\\reports\\roads_index.json",
             "servicesIndex": geojson_dir + "\\reports\\services_index.json",
             "services": {fam["key"]: geojson_dir + "\\geojson\\services\\" + fam["key"] + ".geojson" for fam in SERVICE_FAMILIES},
         },
