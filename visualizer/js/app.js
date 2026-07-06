@@ -119,6 +119,7 @@
 
       var overlayExporter = App.OverlayExporter ? App.OverlayExporter.create({
         map: mapController.map,
+        overlayController: overlayController,
         packIndexPath: packData ? packData.indexPath : ""
       }) : null;
 

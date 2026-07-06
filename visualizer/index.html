@@ -12,45 +12,108 @@
 </head>
 <body>
   <main class="app-shell" aria-label="Visualiseur de zonage réel pour Cities: Skylines II">
-    <div id="map" class="map-canvas" aria-label="Carte interactive des zones extraites d'OpenStreetMap"></div>
 
-    <nav id="location-navigator" class="location-navigator" aria-label="Navigateur mondial">
-      <div class="location-heading">
-        <span class="location-kicker">Monde</span>
-        <strong>Navigation rapide</strong>
-      </div>
-      <label class="location-field" for="location-continent">
-        <span>Continent</span>
-        <select id="location-continent" autocomplete="off"></select>
-      </label>
-      <label class="location-field" for="location-country">
-        <span>Pays</span>
-        <select id="location-country" autocomplete="off" disabled></select>
-      </label>
-      <label class="location-field" for="location-capital">
-        <span>Capitale</span>
-        <select id="location-capital" autocomplete="off" disabled></select>
-      </label>
-      <button id="location-go" type="button" class="location-go" disabled>Aller</button>
-      <span id="location-status" class="location-status" aria-live="polite">Sélectionnez une zone</span>
-    </nav>
-
-    <aside id="dashboard" class="dashboard-panel" aria-label="Tableau de bord de zonage">
-      <header class="app-header">
-        <div class="brand-block">
-          <div class="brand-mark" aria-hidden="true">CS2</div>
-          <div>
-            <p class="eyebrow">Analyse géospatiale</p>
-            <h1>CS2 Zonage Réel</h1>
-            <p class="subtitle">Correspondance OpenStreetMap vers les zones Cities: Skylines II</p>
+    <!-- ================= MenuBar (design Figma MenuBar) ================= -->
+    <header class="menu-bar">
+      <div class="menu-group" aria-label="Menus">
+        <details class="menu">
+          <summary>Fichier</summary>
+          <div class="menu-list">
+            <button type="button" class="menu-item" data-proxy="load-selected-local-bundle">Charger le bundle sélectionné</button>
+            <button type="button" class="menu-item" data-proxy="refresh-bundle-catalog">Actualiser catalogue</button>
+            <div class="menu-separator" role="separator"></div>
+            <button type="button" class="menu-item" data-proxy="unload-displayed-bundle">Décharger le pack affiché</button>
           </div>
-        </div>
-        <div class="dataset-status" aria-live="polite">
-          <span id="dataset-status" class="status-pill">Initialisation</span>
-          <span id="dataset-substatus" class="status-detail">Lecture des données locales</span>
-        </div>
+        </details>
+        <details class="menu">
+          <summary>Affichage</summary>
+          <div class="menu-list">
+            <button type="button" class="menu-item" data-proxy="show-all-layers">Tout afficher</button>
+            <button type="button" class="menu-item" data-proxy="hide-all-layers">Tout masquer</button>
+            <div class="menu-separator" role="separator"></div>
+            <button type="button" class="menu-item" data-proxy="reset-view">Recentrer</button>
+            <button type="button" class="menu-item" data-proxy="panel-toggle">Panneau</button>
+          </div>
+        </details>
+        <details class="menu">
+          <summary>Exportation</summary>
+          <div class="menu-list">
+            <button type="button" class="menu-item" data-proxy="export-overlay-svg">Exporter SVG</button>
+            <button type="button" class="menu-item" data-proxy="export-overlay-png">Exporter PNG</button>
+          </div>
+        </details>
+      </div>
 
-        <section class="catalog-panel" id="local-bundle-catalog-panel">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">CS2</div>
+        <div class="brand-copy">
+          <p class="eyebrow">Analyse géospatiale</p>
+          <h1>CS2 Zonage Réel</h1>
+          <p class="subtitle">Correspondance OpenStreetMap vers les zones Cities: Skylines II</p>
+        </div>
+      </div>
+
+      <div class="dataset-status" aria-live="polite">
+        <span id="dataset-status" class="status-pill">Initialisation</span>
+      </div>
+    </header>
+
+    <!-- ================= TabBar (design Figma TabBar + StickyGenerateButton) ================= -->
+    <div class="tab-bar">
+      <div class="tab-list" role="tablist" aria-label="Vues du panneau">
+        <button type="button" class="tab is-active" role="tab" aria-selected="true" data-tab-target="local-bundle-catalog-panel" aria-controls="local-bundle-catalog-panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          <span>Bundles locaux</span>
+        </button>
+        <button type="button" class="tab" role="tab" aria-selected="false" data-tab-target="cs2-helper-panel" aria-controls="cs2-helper-panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          <span>Informations</span>
+        </button>
+      </div>
+      <button type="button" class="generate-button" data-proxy="load-selected-local-bundle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+        <span>Charger le bundle sélectionné</span>
+      </button>
+    </div>
+
+    <!-- ================= Espace de travail (design Figma App frame) ================= -->
+    <div class="workspace">
+
+      <!-- Rail d'outils vertical (design Figma VerticalToolbar) -->
+      <nav class="tool-rail" aria-label="Outils rapides">
+        <button type="button" class="rail-button" data-proxy="show-all-layers" title="Tout afficher" aria-label="Tout afficher">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button type="button" class="rail-button" data-proxy="hide-all-layers" title="Tout masquer" aria-label="Tout masquer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+        </button>
+        <button type="button" class="rail-button" data-proxy="reset-view" title="Recentrer" aria-label="Recentrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M22 12h-4"/><path d="M6 12H2"/><path d="M12 6V2"/><path d="M12 22v-4"/></svg>
+        </button>
+        <div class="rail-separator" role="separator"></div>
+        <button type="button" class="rail-button" data-proxy="sync-cs2-overlay" title="Synchroniser centre carte" aria-label="Synchroniser centre carte">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+        </button>
+        <button type="button" class="rail-button" data-proxy="fit-cs2-overlay" title="Centrer sur overlay" aria-label="Centrer sur overlay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <div class="rail-separator" role="separator"></div>
+        <button type="button" class="rail-button" data-proxy="export-overlay-svg" title="Exporter SVG" aria-label="Exporter SVG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 12.5-2 2.5 2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/></svg>
+        </button>
+        <button type="button" class="rail-button" data-proxy="export-overlay-png" title="Exporter PNG" aria-label="Exporter PNG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+        </button>
+        <div class="rail-separator" role="separator"></div>
+        <button type="button" class="rail-button" data-proxy="panel-toggle" title="Panneau" aria-label="Panneau">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+        </button>
+      </nav>
+
+      <!-- Panneau gauche : paramètres (design Figma LeftPanel) -->
+      <aside id="dashboard" class="dashboard-panel" aria-label="Tableau de bord de zonage">
+
+        <section class="catalog-panel panel-view" id="local-bundle-catalog-panel" role="tabpanel">
           <h2>Bundles locaux</h2>
 
           <div class="catalog-row">
@@ -64,7 +127,7 @@
             <button id="load-selected-local-bundle" type="button">
               Charger le bundle sélectionné
             </button>
-<button id="refresh-bundle-catalog" type="button">
+            <button id="refresh-bundle-catalog" type="button">
               Actualiser catalogue
             </button>
 
@@ -72,155 +135,197 @@
               Décharger le pack affiché
             </button>
           </div>
-
-          <p id="displayed-bundle-status">
-            Pack affiché actuellement : aucun
-          </p>
-
-          <p id="target-bundle-status">
-            Zone cible sélectionnée : aucune
-          </p>
-
-          <p id="local-bundle-catalog-status">
-            Catalogue local non chargé
-          </p>
         </section>
 
-      </header>
+        <section class="cs2-helper-section panel-view" id="cs2-helper-panel" role="tabpanel" aria-labelledby="cs2-helper-title" hidden>
+          <div class="section-heading">
+            <h2 id="cs2-helper-title">Informations</h2>
+            <span id="cs2-helper-status" class="section-meta">Overlay CS2</span>
+          </div>
+          <div class="cs2-helper-inputs">
+            <label class="cs2-helper-field" for="cs2-helper-city">
+              <span>Nom</span>
+              <input id="cs2-helper-city" type="text" value="" autocomplete="off">
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-country">
+              <span>Pays</span>
+              <input id="cs2-helper-country" type="text" value="" autocomplete="off">
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-country-code">
+              <span>Code pays</span>
+              <input id="cs2-helper-country-code" type="text" value="" autocomplete="off">
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-water-level">
+              <span>Niveau eau conseillé</span>
+              <input id="cs2-helper-water-level" type="number" step="0.001" value="511.7">
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-bundle-id">
+              <span>Bundle ID</span>
+              <input id="cs2-helper-bundle-id" type="text" value="" readonly>
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-size">
+              <span>World map (km)</span>
+              <input id="cs2-helper-size" type="number" min="0.1" max="500" step="0.001" value="57.344">
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-heightmap-size">
+              <span>Heightmap (km)</span>
+              <input id="cs2-helper-heightmap-size" type="number" min="0.1" max="500" step="0.001" value="14.336">
+            </label>
+            <label class="cs2-helper-field" for="cs2-helper-step">
+              <span>Pas</span>
+              <select id="cs2-helper-step">
+                <option value="1">1 m</option>
+                <option value="10" selected>10 m</option>
+                <option value="100">100 m</option>
+                <option value="1000">1 km</option>
+              </select>
+            </label>
+          </div>
+          <dl class="cs2-helper-readouts">
+            <div>
+              <dt>Latitude centre</dt>
+              <dd id="cs2-helper-lat">-</dd>
+            </div>
+            <div>
+              <dt>Longitude centre</dt>
+              <dd id="cs2-helper-lon">-</dd>
+            </div>
+            <div>
+              <dt>Zoom Leaflet</dt>
+              <dd id="cs2-helper-zoom">-</dd>
+            </div>
+          </dl>
+          <div class="cs2-helper-nudge" aria-label="Déplacement précis de l'overlay CS2">
+            <button id="cs2-move-north" type="button" class="nudge-button nudge-north">Nord</button>
+            <button id="cs2-move-west" type="button" class="nudge-button nudge-west">Ouest</button>
+            <button id="cs2-move-east" type="button" class="nudge-button nudge-east">Est</button>
+            <button id="cs2-move-south" type="button" class="nudge-button nudge-south">Sud</button>
+          </div>
+          <div class="cs2-helper-actions">
+            <button id="sync-cs2-overlay" type="button" class="control-button">Synchroniser centre carte</button>
+            <button id="fit-cs2-overlay" type="button" class="control-button control-button-primary">Centrer sur overlay</button>
+          </div>
+          <div class="cs2-helper-output">
+            <div class="cs2-helper-output-heading">
+              <span>BBOX world map</span>
+              <button id="copy-cs2-bbox" type="button" class="copy-button">Copier</button>
+            </div>
+            <output id="cs2-helper-bbox">-</output>
+          </div>
+          <div class="cs2-helper-output">
+            <div class="cs2-helper-output-heading">
+              <span>BBOX heightmap</span>
+              <button id="copy-cs2-heightmap-bbox" type="button" class="copy-button">Copier</button>
+            </div>
+            <output id="cs2-helper-heightmap-bbox">-</output>
+          </div>
+          <div class="cs2-helper-output">
+            <div class="cs2-helper-output-heading">
+              <span>Commande Python</span>
+              <button id="copy-cs2-command" type="button" class="copy-button">Copier</button>
+            </div>
+            <output id="cs2-helper-command">-</output>
+          </div>
+          <div class="cs2-helper-output">
+            <div class="cs2-helper-output-heading">
+              <span>Commande bundle complet</span>
+              <button id="copy-cs2-bundle-command" type="button" class="copy-button">Copier</button>
+            </div>
+            <output id="cs2-helper-bundle-command">-</output>
+          </div>
+        </section>
+      </aside>
 
-      <section class="metrics-section" aria-labelledby="metrics-title">
-        <div class="section-heading">
-          <h2 id="metrics-title">Indicateurs</h2>
-          <span id="metrics-context" class="section-meta">Jeu de données local</span>
-        </div>
-        <div id="metrics-grid" class="metrics-grid" aria-live="polite"></div>
-      </section>
+      <!-- Poignée de repli du panneau (design Figma LeftPanel toggle) -->
+      <button id="panel-toggle" type="button" class="panel-toggle" aria-controls="dashboard" aria-expanded="true">
+        <span class="panel-toggle-label">Panneau</span>
+      </button>
 
-      <section class="cs2-helper-section" aria-labelledby="cs2-helper-title">
-        <div class="section-heading">
-          <h2 id="cs2-helper-title">Informations</h2>
-          <span id="cs2-helper-status" class="section-meta">Overlay CS2</span>
-        </div>
-        <div class="cs2-helper-inputs">
-          <label class="cs2-helper-field" for="cs2-helper-city">
-            <span>Nom</span>
-            <input id="cs2-helper-city" type="text" value="" autocomplete="off">
+      <!-- Canvas central (design Figma CanvasWorkspace) -->
+      <section class="canvas-area" aria-label="Zone de carte">
+        <nav id="location-navigator" class="location-navigator" aria-label="Navigateur mondial">
+          <div class="location-heading">
+            <span class="location-kicker">Monde</span>
+            <strong>Navigation rapide</strong>
+          </div>
+          <label class="location-field" for="location-continent">
+            <span>Continent</span>
+            <select id="location-continent" autocomplete="off"></select>
           </label>
-          <label class="cs2-helper-field" for="cs2-helper-country">
+          <label class="location-field" for="location-country">
             <span>Pays</span>
-            <input id="cs2-helper-country" type="text" value="" autocomplete="off">
+            <select id="location-country" autocomplete="off" disabled></select>
           </label>
-          <label class="cs2-helper-field" for="cs2-helper-country-code">
-            <span>Code pays</span>
-            <input id="cs2-helper-country-code" type="text" value="" autocomplete="off">
+          <label class="location-field" for="location-capital">
+            <span>Capitale</span>
+            <select id="location-capital" autocomplete="off" disabled></select>
           </label>
-          <label class="cs2-helper-field" for="cs2-helper-water-level">
-            <span>Niveau eau conseillé</span>
-            <input id="cs2-helper-water-level" type="number" step="0.001" value="511.7">
-          </label>
-          <label class="cs2-helper-field" for="cs2-helper-bundle-id">
-            <span>Bundle ID</span>
-            <input id="cs2-helper-bundle-id" type="text" value="" readonly>
-          </label>
-          <label class="cs2-helper-field" for="cs2-helper-size">
-            <span>World map (km)</span>
-            <input id="cs2-helper-size" type="number" min="0.1" max="500" step="0.001" value="57.344">
-          </label>
-          <label class="cs2-helper-field" for="cs2-helper-heightmap-size">
-            <span>Heightmap (km)</span>
-            <input id="cs2-helper-heightmap-size" type="number" min="0.1" max="500" step="0.001" value="14.336">
-          </label>
-          <label class="cs2-helper-field" for="cs2-helper-step">
-            <span>Pas</span>
-            <select id="cs2-helper-step">
-              <option value="1">1 m</option>
-              <option value="10" selected>10 m</option>
-              <option value="100">100 m</option>
-              <option value="1000">1 km</option>
-            </select>
-          </label>
-        </div>
-        <dl class="cs2-helper-readouts">
-          <div>
-            <dt>Latitude centre</dt>
-            <dd id="cs2-helper-lat">-</dd>
-          </div>
-          <div>
-            <dt>Longitude centre</dt>
-            <dd id="cs2-helper-lon">-</dd>
-          </div>
-          <div>
-            <dt>Zoom Leaflet</dt>
-            <dd id="cs2-helper-zoom">-</dd>
-          </div>
-        </dl>
-        <div class="cs2-helper-nudge" aria-label="Déplacement précis de l'overlay CS2">
-          <button id="cs2-move-north" type="button" class="nudge-button nudge-north">Nord</button>
-          <button id="cs2-move-west" type="button" class="nudge-button nudge-west">Ouest</button>
-          <button id="cs2-move-east" type="button" class="nudge-button nudge-east">Est</button>
-          <button id="cs2-move-south" type="button" class="nudge-button nudge-south">Sud</button>
-        </div>
-        <div class="cs2-helper-actions">
-          <button id="sync-cs2-overlay" type="button" class="control-button">Synchroniser centre carte</button>
-          <button id="fit-cs2-overlay" type="button" class="control-button control-button-primary">Centrer sur overlay</button>
-        </div>
-        <div class="cs2-helper-output">
-          <div class="cs2-helper-output-heading">
-            <span>BBOX world map</span>
-            <button id="copy-cs2-bbox" type="button" class="copy-button">Copier</button>
-          </div>
-          <output id="cs2-helper-bbox">-</output>
-        </div>
-        <div class="cs2-helper-output">
-          <div class="cs2-helper-output-heading">
-            <span>BBOX heightmap</span>
-            <button id="copy-cs2-heightmap-bbox" type="button" class="copy-button">Copier</button>
-          </div>
-          <output id="cs2-helper-heightmap-bbox">-</output>
-        </div>
-        <div class="cs2-helper-output">
-          <div class="cs2-helper-output-heading">
-            <span>Commande Python</span>
-            <button id="copy-cs2-command" type="button" class="copy-button">Copier</button>
-          </div>
-          <output id="cs2-helper-command">-</output>
-        </div>
-		<div class="cs2-helper-output">
-  <div class="cs2-helper-output-heading">
-    <span>Commande bundle complet</span>
-    <button id="copy-cs2-bundle-command" type="button" class="copy-button">Copier</button>
-  </div>
-  <output id="cs2-helper-bundle-command">-</output>
-</div>
-
+          <button id="location-go" type="button" class="location-go" disabled>Aller</button>
+          <span id="location-status" class="location-status" aria-live="polite">Sélectionnez une zone</span>
+        </nav>
+        <div id="map" class="map-canvas" aria-label="Carte interactive des zones extraites d'OpenStreetMap"></div>
       </section>
 
-      <section class="controls-section" aria-labelledby="layers-title">
-        <div class="section-heading">
-          <h2 id="layers-title">Couches</h2>
-          <span id="visible-count" class="section-meta">0 active</span>
-        </div>
-        <div class="toolbar" aria-label="Actions rapides sur les couches">
-          <button id="show-all-layers" type="button" class="control-button">Tout afficher</button>
-          <button id="hide-all-layers" type="button" class="control-button">Tout masquer</button>
-          <button id="reset-view" type="button" class="control-button control-button-primary">Recentrer</button>
-          <button id="export-overlay-svg" type="button" class="control-button">Exporter SVG</button>
-        </div>
-        <div id="layer-controls" class="layer-list" role="list"></div>
-      </section>
+      <!-- Panneau droit : analyse (design Figma RightPanel) -->
+      <aside class="analysis-panel" aria-label="Analyse du zonage">
 
-      <section class="services-section" aria-labelledby="services-title">
-        <div class="section-heading">
-          <h2 id="services-title">Services</h2>
-          <span id="services-context" class="section-meta">Familles CityTimeline</span>
-        </div>
-        <div id="services-list" class="services-list" aria-live="polite"></div>
-      </section>
-    </aside>
+        <section class="metrics-section" aria-labelledby="metrics-title">
+          <div class="section-heading">
+            <h2 id="metrics-title">Indicateurs</h2>
+            <span id="metrics-context" class="section-meta">Jeu de données local</span>
+          </div>
+          <div id="metrics-grid" class="metrics-grid" aria-live="polite"></div>
+        </section>
 
-    <button id="panel-toggle" type="button" class="panel-toggle" aria-controls="dashboard" aria-expanded="true">
-      Panneau
-    </button>
+        <div class="analysis-tabs" role="tablist" aria-label="Sections d'analyse">
+          <button type="button" class="analysis-tab is-active" role="tab" aria-selected="true" data-tab-target="layers-panel" aria-controls="layers-panel">Couches</button>
+          <button type="button" class="analysis-tab" role="tab" aria-selected="false" data-tab-target="services-panel" aria-controls="services-panel">Services</button>
+        </div>
+
+        <section class="controls-section panel-view" id="layers-panel" role="tabpanel" aria-labelledby="layers-title">
+          <div class="section-heading">
+            <h2 id="layers-title">Couches</h2>
+            <span id="visible-count" class="section-meta">0 active</span>
+          </div>
+          <div class="toolbar" aria-label="Actions rapides sur les couches">
+            <button id="show-all-layers" type="button" class="control-button">Tout afficher</button>
+            <button id="hide-all-layers" type="button" class="control-button">Tout masquer</button>
+            <button id="reset-view" type="button" class="control-button control-button-primary">Recentrer</button>
+            <button id="export-overlay-svg" type="button" class="control-button">Exporter SVG</button>
+            <button id="export-overlay-png" type="button" class="control-button">Exporter PNG</button>
+          </div>
+          <div id="layer-controls" class="layer-list" role="list"></div>
+        </section>
+
+        <section class="services-section panel-view" id="services-panel" role="tabpanel" aria-labelledby="services-title" hidden>
+          <div class="section-heading">
+            <h2 id="services-title">Services</h2>
+            <span id="services-context" class="section-meta">Familles CityTimeline</span>
+          </div>
+          <div id="services-list" class="services-list" aria-live="polite"></div>
+        </section>
+      </aside>
+    </div>
+
+    <!-- ================= Barre de statut (design Figma StatusBar) ================= -->
+    <footer class="status-bar" aria-label="Barre de statut">
+      <div class="status-left">
+        <p id="displayed-bundle-status">
+          Pack affiché actuellement : aucun
+        </p>
+        <span class="status-sep" aria-hidden="true">|</span>
+        <p id="target-bundle-status">
+          Zone cible sélectionnée : aucune
+        </p>
+        <span class="status-sep" aria-hidden="true">|</span>
+        <p id="local-bundle-catalog-status">
+          Catalogue local non chargé
+        </p>
+      </div>
+      <div class="status-right" aria-live="polite">
+        <span id="dataset-substatus" class="status-detail">Lecture des données locales</span>
+      </div>
+    </footer>
 
     <section id="empty-state" class="state-card empty-state" hidden aria-live="polite">
       <p class="eyebrow">Aucune donnée détectée</p>
@@ -259,5 +364,6 @@
   <script src="./js/services-controller.js"></script>
   <script src="./js/overlay-exporter.js"></script>
   <script src="./js/app.js"></script>
+  <script src="./js/ui-chrome.js"></script>
 </body>
 </html>

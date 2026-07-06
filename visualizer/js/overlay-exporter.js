@@ -1,6 +1,8 @@
 (function (App) {
   "use strict";
 
+  var HEIGHTMAP_EXPORT_PIXELS = 4096;
+
   function byId(id) {
     return document.getElementById(id);
   }
@@ -69,9 +71,9 @@
     });
   }
 
-  function projectPath(map, latlngs) {
+  function projectPath(projector, latlngs) {
     return latlngs.map(function (latlng) {
-      return map.latLngToContainerPoint(latlng);
+      return projector.project(latlng);
     }).filter(finitePoint);
   }
 
@@ -141,8 +143,170 @@
     return attrs.join(" ");
   }
 
-  function exportPolylineLayer(map, layer, width, height, isPolygon) {
-    var margin = 24;
+  function numericOption(value, fallback) {
+    var number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function dashArray(value) {
+    if (!value) {
+      return [];
+    }
+
+    return String(value).split(/[,\s]+/).map(function (item) {
+      return Number(item);
+    }).filter(function (number) {
+      return Number.isFinite(number) && number >= 0;
+    });
+  }
+
+  function applyCanvasStyle(context, layer) {
+    var options = layer.options || {};
+    var stroke = validColor(options.color, "#58d8ff");
+
+    context.lineWidth = numericOption(options.weight, 1);
+    context.lineCap = options.lineCap || "round";
+    context.lineJoin = options.lineJoin || "round";
+    context.strokeStyle = stroke;
+    context.setLineDash(dashArray(options.dashArray));
+  }
+
+  function traceCanvasPath(context, points, closePath) {
+    if (!points.length) {
+      return;
+    }
+
+    context.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach(function (point) {
+      context.lineTo(point.x, point.y);
+    });
+
+    if (closePath) {
+      context.closePath();
+    }
+  }
+
+  function drawCanvasPolylineLayer(context, projector, layer, isPolygon) {
+    var margin = projector.margin == null ? 24 : projector.margin;
+    var width = projector.width;
+    var height = projector.height;
+    var options = layer.options || {};
+    var strokeOpacity = numericOption(options.opacity, 1);
+    var drawn = 0;
+
+    if (isPolygon) {
+      var polygonGroups = [];
+
+      collectPolygonGroups(layer.getLatLngs(), polygonGroups);
+      polygonGroups.forEach(function (group) {
+        var projectedRings = group.map(function (ring) {
+          return projectPath(projector, ring);
+        }).filter(function (points) {
+          return points.length >= 3;
+        });
+
+        if (!projectedRings.length) {
+          return;
+        }
+
+        var groupBounds = projectedRings.reduce(function (bounds, points) {
+          var current = pathBounds(points);
+          bounds.minX = Math.min(bounds.minX, current.minX);
+          bounds.minY = Math.min(bounds.minY, current.minY);
+          bounds.maxX = Math.max(bounds.maxX, current.maxX);
+          bounds.maxY = Math.max(bounds.maxY, current.maxY);
+          return bounds;
+        }, {
+          minX: Infinity,
+          minY: Infinity,
+          maxX: -Infinity,
+          maxY: -Infinity
+        });
+
+        if (!intersectsViewport(groupBounds, width, height, margin)) {
+          return;
+        }
+
+        context.save();
+        applyCanvasStyle(context, layer);
+        context.beginPath();
+        projectedRings.forEach(function (points) {
+          traceCanvasPath(context, points, true);
+        });
+        context.globalAlpha = numericOption(options.fillOpacity, 0.48);
+        context.fillStyle = validColor(options.fillColor || options.color, validColor(options.color, "#58d8ff"));
+        context.fill("evenodd");
+        context.globalAlpha = strokeOpacity;
+        context.stroke();
+        context.restore();
+        drawn += 1;
+      });
+
+      return drawn;
+    }
+
+    var latlngPaths = [];
+
+    collectLatLngPaths(layer.getLatLngs(), latlngPaths);
+    latlngPaths.forEach(function (latlngs) {
+      var points = projectPath(projector, latlngs);
+
+      if (points.length < 2 || !intersectsViewport(pathBounds(points), width, height, margin)) {
+        return;
+      }
+
+      context.save();
+      applyCanvasStyle(context, layer);
+      context.beginPath();
+      traceCanvasPath(context, points, false);
+      context.globalAlpha = strokeOpacity;
+      context.stroke();
+      context.restore();
+      drawn += 1;
+    });
+
+    return drawn;
+  }
+
+  function drawCanvasCircleMarkerLayer(context, projector, layer) {
+    var latlng = layer.getLatLng && layer.getLatLng();
+    var point = latlng ? projector.project(latlng) : null;
+    var margin = projector.margin == null ? 24 : projector.margin;
+    var width = projector.width;
+    var height = projector.height;
+    var options = layer.options || {};
+    var radius = Number(layer._radius || options.radius || 5);
+    var color = validColor(options.color, "#58d8ff");
+    var fill = validColor(options.fillColor || options.color, color);
+
+    if (!finitePoint(point) || !intersectsViewport({
+      minX: point.x - radius,
+      minY: point.y - radius,
+      maxX: point.x + radius,
+      maxY: point.y + radius
+    }, width, height, margin)) {
+      return 0;
+    }
+
+    context.save();
+    context.beginPath();
+    context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    context.globalAlpha = numericOption(options.fillOpacity, 0.85);
+    context.fillStyle = fill;
+    context.fill();
+    context.globalAlpha = numericOption(options.opacity, 1);
+    context.lineWidth = numericOption(options.weight, 1);
+    context.strokeStyle = color;
+    context.stroke();
+    context.restore();
+
+    return 1;
+  }
+
+  function exportPolylineLayer(projector, layer, isPolygon) {
+    var margin = projector.margin == null ? 24 : projector.margin;
+    var width = projector.width;
+    var height = projector.height;
     var style = pathStyle(layer, isPolygon);
     var elements = [];
 
@@ -152,7 +316,7 @@
       collectPolygonGroups(layer.getLatLngs(), polygonGroups);
       polygonGroups.forEach(function (group) {
         var projectedRings = group.map(function (ring) {
-          return projectPath(map, ring);
+          return projectPath(projector, ring);
         }).filter(function (points) {
           return points.length >= 3;
         });
@@ -191,7 +355,7 @@
 
     collectLatLngPaths(layer.getLatLngs(), latlngPaths);
     latlngPaths.forEach(function (latlngs) {
-      var points = projectPath(map, latlngs);
+      var points = projectPath(projector, latlngs);
 
       if (points.length < (isPolygon ? 3 : 2)) {
         return;
@@ -207,10 +371,12 @@
     return elements;
   }
 
-  function exportCircleMarkerLayer(map, layer, width, height) {
+  function exportCircleMarkerLayer(projector, layer) {
     var latlng = layer.getLatLng && layer.getLatLng();
-    var point = latlng ? map.latLngToContainerPoint(latlng) : null;
-    var margin = 24;
+    var point = latlng ? projector.project(latlng) : null;
+    var margin = projector.margin == null ? 24 : projector.margin;
+    var width = projector.width;
+    var height = projector.height;
     var options = layer.options || {};
     var radius = Number(layer._radius || options.radius || 5);
     var color = validColor(options.color, "#58d8ff");
@@ -236,42 +402,187 @@
       '" />'];
   }
 
-  function collectVectorElements(map, size) {
+  function shouldExportLayer(layer) {
+    var options = layer.options || {};
+
+    if (options.pane === "cs2-overlay-pane") {
+      return false;
+    }
+
+    return true;
+  }
+
+  function collectVectorElements(map, projector) {
     var elements = [];
 
     map.eachLayer(function (layer) {
+      if (!shouldExportLayer(layer)) {
+        return;
+      }
+
       if (layer instanceof L.CircleMarker) {
-        elements = elements.concat(exportCircleMarkerLayer(map, layer, size.x, size.y));
+        elements = elements.concat(exportCircleMarkerLayer(projector, layer));
         return;
       }
 
       if (layer instanceof L.Polygon) {
-        elements = elements.concat(exportPolylineLayer(map, layer, size.x, size.y, true));
+        elements = elements.concat(exportPolylineLayer(projector, layer, true));
         return;
       }
 
       if (layer instanceof L.Polyline) {
-        elements = elements.concat(exportPolylineLayer(map, layer, size.x, size.y, false));
+        elements = elements.concat(exportPolylineLayer(projector, layer, false));
       }
     });
 
     return elements;
   }
 
-  function buildSvg(map, elements) {
+  function drawCanvasOverlay(map, projector) {
+    var canvas = document.createElement("canvas");
+    var context = canvas.getContext("2d");
+    var drawn = 0;
+
+    canvas.width = projector.width;
+    canvas.height = projector.height;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    map.eachLayer(function (layer) {
+      if (!shouldExportLayer(layer)) {
+        return;
+      }
+
+      if (layer instanceof L.CircleMarker) {
+        drawn += drawCanvasCircleMarkerLayer(context, projector, layer);
+        return;
+      }
+
+      if (layer instanceof L.Polygon) {
+        drawn += drawCanvasPolylineLayer(context, projector, layer, true);
+        return;
+      }
+
+      if (layer instanceof L.Polyline) {
+        drawn += drawCanvasPolylineLayer(context, projector, layer, false);
+      }
+    });
+
+    return {
+      canvas: canvas,
+      drawn: drawn
+    };
+  }
+
+  function bboxFromLeafletBounds(bounds) {
+    return {
+      south: bounds.getSouth(),
+      west: bounds.getWest(),
+      north: bounds.getNorth(),
+      east: bounds.getEast()
+    };
+  }
+
+  function normalizeBBox(value) {
+    if (!value) {
+      return null;
+    }
+
+    var bbox = {
+      south: Number(value.south),
+      west: Number(value.west),
+      north: Number(value.north),
+      east: Number(value.east)
+    };
+
+    if (
+      !Number.isFinite(bbox.south) ||
+      !Number.isFinite(bbox.west) ||
+      !Number.isFinite(bbox.north) ||
+      !Number.isFinite(bbox.east) ||
+      bbox.south >= bbox.north ||
+      bbox.west >= bbox.east
+    ) {
+      return null;
+    }
+
+    return bbox;
+  }
+
+  function createViewportProjector(map) {
     var size = map.getSize();
     var center = map.getCenter();
     var bounds = map.getBounds();
-    var metadata = {
-      exportedAt: new Date().toISOString(),
-      center: { lat: center.lat, lng: center.lng },
-      zoom: map.getZoom(),
-      bounds: {
-        south: bounds.getSouth(),
-        west: bounds.getWest(),
-        north: bounds.getNorth(),
-        east: bounds.getEast()
+
+    return {
+      width: size.x,
+      height: size.y,
+      margin: 24,
+      project: function (latlng) {
+        return map.latLngToContainerPoint(latlng);
       },
+      metadata: {
+        mode: "leaflet-viewport",
+        exportedAt: new Date().toISOString(),
+        center: { lat: center.lat, lng: center.lng },
+        zoom: map.getZoom(),
+        bounds: bboxFromLeafletBounds(bounds)
+      }
+    };
+  }
+
+  function createBBoxProjector(map, bbox, pixels) {
+    var normalized = normalizeBBox(bbox);
+    var size = Number(pixels);
+    var crs = map.options && map.options.crs ? map.options.crs : L.CRS.EPSG3857;
+    var zoom = 0;
+    var northWest;
+    var southEast;
+
+    if (!normalized || !Number.isFinite(size) || size <= 0) {
+      return null;
+    }
+
+    northWest = crs.latLngToPoint(L.latLng(normalized.north, normalized.west), zoom);
+    southEast = crs.latLngToPoint(L.latLng(normalized.south, normalized.east), zoom);
+
+    if (
+      !finitePoint(northWest) ||
+      !finitePoint(southEast) ||
+      northWest.x === southEast.x ||
+      northWest.y === southEast.y
+    ) {
+      return null;
+    }
+
+    return {
+      width: size,
+      height: size,
+      margin: 0,
+      project: function (latlng) {
+        var point = crs.latLngToPoint(latlng, zoom);
+
+        return L.point(
+          (point.x - northWest.x) / (southEast.x - northWest.x) * size,
+          (point.y - northWest.y) / (southEast.y - northWest.y) * size
+        );
+      },
+      metadata: {
+        mode: "heightmap-bbox",
+        exportedAt: new Date().toISOString(),
+        pixels: size,
+        bounds: normalized,
+        projection: "Leaflet EPSG:3857"
+      }
+    };
+  }
+
+  function buildSvg(projector, elements) {
+    var size = {
+      x: projector.width,
+      y: projector.height
+    };
+    var metadata = {
+      export: projector.metadata || {},
       elementCount: elements.length
     };
 
@@ -291,8 +602,7 @@
     ].join("\n");
   }
 
-  function downloadText(filename, text, mimeType) {
-    var blob = new Blob([text], { type: mimeType });
+  function downloadBlob(filename, blob) {
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
 
@@ -306,55 +616,148 @@
     }, 0);
   }
 
+  function downloadText(filename, text, mimeType) {
+    downloadBlob(filename, new Blob([text], { type: mimeType }));
+  }
+
+  function canvasToPngBlob(canvas) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (pngBlob) {
+        if (pngBlob) {
+          resolve(pngBlob);
+          return;
+        }
+        reject(new Error("Impossible de générer le PNG."));
+      }, "image/png");
+    });
+  }
+
   function filenamePrefix(packIndexPath) {
     var match = String(packIndexPath || "").match(/exports\/bundles\/([^/\\]+)\/geojson_pack/i);
     return match ? match[1] : "leaflet_overlay";
   }
 
   function flashButton(button, text) {
-    var original = button.textContent;
+    if (!button) {
+      return;
+    }
+
+    var original = button.dataset.overlayExporterOriginal || button.textContent;
+
+    window.clearTimeout(Number(button.dataset.overlayExporterTimer || 0));
+    button.dataset.overlayExporterOriginal = original;
     button.textContent = text;
-    window.setTimeout(function () {
+    button.dataset.overlayExporterTimer = String(window.setTimeout(function () {
       button.textContent = original;
-    }, 1200);
+      delete button.dataset.overlayExporterOriginal;
+      delete button.dataset.overlayExporterTimer;
+    }, 1200));
+  }
+
+  function setButtonBusy(button, text) {
+    if (!button) {
+      return;
+    }
+
+    var original = button.dataset.overlayExporterOriginal || button.textContent;
+
+    window.clearTimeout(Number(button.dataset.overlayExporterTimer || 0));
+    button.dataset.overlayExporterOriginal = original;
+    button.textContent = text;
   }
 
   function exportOverlay(context) {
     var map = context.map;
-    var size = map.getSize();
-    var elements = collectVectorElements(map, size);
+    var projector = createViewportProjector(map);
+    var elements = collectVectorElements(map, projector);
 
     if (!elements.length) {
-      flashButton(context.button, "Aucun overlay");
+      flashButton(context.svgButton, "Aucun overlay");
       return;
     }
 
     var filename = filenamePrefix(context.packIndexPath) + "_leaflet_overlay.svg";
-    downloadText(filename, buildSvg(map, elements), "image/svg+xml;charset=utf-8");
-    flashButton(context.button, "SVG exporté");
+    downloadText(filename, buildSvg(projector, elements), "image/svg+xml;charset=utf-8");
+    flashButton(context.svgButton, "SVG exporté");
+  }
+
+  function currentHeightmapBBox(context) {
+    var state = context.overlayController && context.overlayController.getState
+      ? context.overlayController.getState()
+      : null;
+
+    return normalizeBBox(state && state.heightmapBBox) ||
+      bboxFromLeafletBounds(context.map.getBounds());
+  }
+
+  function exportOverlayPng(context) {
+    var map = context.map;
+    var bbox = currentHeightmapBBox(context);
+    var projector = createBBoxProjector(map, bbox, HEIGHTMAP_EXPORT_PIXELS);
+    var filename;
+
+    if (!projector) {
+      flashButton(context.pngButton, "BBOX invalide");
+      return;
+    }
+
+    filename = filenamePrefix(context.packIndexPath) +
+      "_leaflet_overlay_heightmap_" + HEIGHTMAP_EXPORT_PIXELS + ".png";
+
+    setButtonBusy(context.pngButton, "PNG en cours");
+    window.setTimeout(function () {
+      var rendered = drawCanvasOverlay(map, projector);
+
+      if (!rendered.drawn) {
+        flashButton(context.pngButton, "Aucun overlay");
+        return;
+      }
+
+      canvasToPngBlob(rendered.canvas).then(function (blob) {
+        downloadBlob(filename, blob);
+        flashButton(context.pngButton, "PNG exporté");
+      }).catch(function (error) {
+        console.error("[OverlayExporter] Export PNG impossible.", error);
+        flashButton(context.pngButton, "Erreur PNG");
+      });
+    }, 0);
   }
 
   function create(options) {
-    var button = byId("export-overlay-svg");
+    var svgButton = byId("export-overlay-svg");
+    var pngButton = byId("export-overlay-png");
     var map = options && options.map;
 
-    if (!button || !map || typeof L === "undefined") {
+    if ((!svgButton && !pngButton) || !map || typeof L === "undefined") {
       return null;
     }
 
     var context = {
-      button: button,
+      svgButton: svgButton,
+      pngButton: pngButton,
       map: map,
+      overlayController: options.overlayController || null,
       packIndexPath: options.packIndexPath || ""
     };
 
-    button.addEventListener("click", function () {
-      exportOverlay(context);
-    });
+    if (svgButton) {
+      svgButton.addEventListener("click", function () {
+        exportOverlay(context);
+      });
+    }
+
+    if (pngButton) {
+      pngButton.addEventListener("click", function () {
+        exportOverlayPng(context);
+      });
+    }
 
     return {
       exportSvg: function () {
         exportOverlay(context);
+      },
+      exportPng: function () {
+        exportOverlayPng(context);
       }
     };
   }
