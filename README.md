@@ -36,6 +36,7 @@ Le projet sert à générer des bundles contenant notamment :
 
 - des couches GeoJSON extraites depuis OpenStreetMap ;
 - des routes, chemins, surfaces d’eau, lignes d’eau et zones d’usage ;
+- des couches de services en points (9 familles : éducation, incendie, médical, parcs, électricité, déchets, transport, eau, communications) ;
 - des PNG `worldmap` et `heightmap` compatibles avec le workflow CS2 ;
 - un `manifest.json` décrivant le bundle ;
 - un `timeline_config.json` utilisable par CityTimelineMod ;
@@ -90,7 +91,7 @@ $env:MAPBOX_TOKEN = "votre-token"
 
 ## Ouvrir le visualiseur
 
-Le visualiseur charge les GeoJSON avec `fetch`; il doit donc etre servi en HTTP local depuis la racine du depot :
+Le visualiseur charge les GeoJSON avec `fetch` ; il doit donc être servi en HTTP local depuis la racine du dépôt :
 
 ```powershell
 python -m http.server 8000
@@ -104,12 +105,12 @@ http://localhost:8000/visualizer/
 
 ## Limites connues
 
-- La qualite depend directement des tags OpenStreetMap.
-- `building:levels` est souvent incomplet ; la densite residentielle peut rester basse par defaut.
-- Overpass peut etre lent ou echouer sur de grandes emprises. Le pipeline reduit le risque avec des requetes separees et une rotation de serveurs, sans le supprimer.
-- Les exports Terrain RGB necessitent un fournisseur externe, une cle API et une connexion reseau.
-- Les couches transport public, services, electricite, egouts, dechets, ressources naturelles, parcs et `unknown` restent prevues mais non implementees dans le pipeline courant.
-- Le projet prepare des ressources et contrats ; l'integration finale cote jeu ou mod reste une etape separee.
+- La qualité dépend directement des tags OpenStreetMap.
+- `building:levels` est souvent incomplet ; la densité résidentielle peut rester basse par défaut.
+- Overpass peut être lent ou échouer sur de grandes emprises. Le pipeline réduit le risque avec des requêtes séparées et une rotation de serveurs, sans le supprimer.
+- Les exports Terrain RGB nécessitent un fournisseur externe, une clé API et une connexion réseau.
+- Les services sont extraits en points (centroïdes) : pas d'emprises surfaciques ni de réseaux (égouts, canalisations) dans le pipeline courant.
+- Le projet prépare des ressources et contrats ; l'intégration finale côté jeu ou mod reste une étape séparée.
 
 ---
 
