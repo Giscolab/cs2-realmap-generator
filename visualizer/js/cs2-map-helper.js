@@ -204,7 +204,8 @@
       return;
     }
 
-    var command = CommandBuilder.buildCommand(cityName, state.heightmapBBoxText, bundleMeta);
+    // Extraction GeoJSON sur la bbox worldmap (57 km) - source de verite (cf. bundle Paris).
+    var command = CommandBuilder.buildCommand(cityName, state.worldMapBBoxText, bundleMeta);
     var fullBundleCommand = CommandBuilder.buildFullBundleCommand(state, bundleMeta);
 
     context.currentCommand = command;

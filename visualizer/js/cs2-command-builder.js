@@ -24,7 +24,9 @@
     return bundleMeta.dir;
   }
 
-  function buildCommand(cityName, bboxText, bundleMeta) {
+  // Source de verite : l'extraction GeoJSON couvre TOUJOURS la bbox worldmap
+  // (57,344 km), jamais la bbox heightmap (14,336 km). Reference : bundle Paris.
+  function buildCommand(cityName, worldMapBBoxText, bundleMeta) {
     var pythonExe = "python";
     var scriptPath = ".\\src\\extract_zoning.py";
     return [
@@ -33,7 +35,7 @@
       "--city", quoteArg(cityName),
       "--country", quoteArg(bundleMeta.country),
       "--country-code", quoteArg(bundleMeta.countryCode),
-      "--bbox", quoteArg(bboxText),
+      "--bbox", quoteArg(worldMapBBoxText),
       "--bundle-output",
       "--bundle-id", quoteArg(bundleMeta.id),
       "--split-layers"
@@ -89,7 +91,7 @@
       "  --city $city `",
       "  --country $country `",
       "  --country-code $countryCode `",
-      "  --bbox " + quoteArg(state.heightmapBBoxText) + " `",
+      "  --bbox " + quoteArg(state.worldMapBBoxText) + " `",
       "  --bundle-output `",
       "  --bundle-id $bundleId `",
       "  --split-layers",

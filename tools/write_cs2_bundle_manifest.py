@@ -443,6 +443,63 @@ def validate_manifest_invariants(manifest: dict, *, span_tolerance: float = 0.10
         )
 
 
+def validate_geojson_extraction_bbox(
+    repo_root: Path,
+    manifest: dict,
+    *,
+    coord_tolerance: float = 1e-3,
+) -> None:
+    """Garde-fou « source de vérité » (référence : bundle Paris).
+
+    Le pack GeoJSON doit couvrir la bbox worldmap (57,344 km), pas la bbox
+    heightmap (14,336 km). Si le rapport d'extraction existe, sa bbox doit
+    correspondre à worldMap.bbox du manifeste (à coord_tolerance degré près).
+    Lève SystemExit en cas d'écart, pour empêcher la publication d'un bundle
+    dont les GeoJSON ne couvrent pas la worldmap complète.
+    """
+    report_path = resolve_repo_path(repo_root, manifest["geojson"]["extractionReport"])
+
+    if not report_path.exists():
+        print(
+            "[AVERTISSEMENT] Rapport d'extraction introuvable "
+            f"({report_path}) : bbox GeoJSON non vérifiée. "
+            "Lancez extract_zoning.py avec la bbox worldmap avant le manifeste."
+        )
+        return
+
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(
+            f"[ERREUR] Rapport d'extraction illisible : {report_path} ({exc})"
+        ) from exc
+
+    report_bbox = report.get("bbox")
+
+    if not report_bbox:
+        print(
+            f"[AVERTISSEMENT] Rapport d'extraction sans bbox ({report_path}) : "
+            "bbox GeoJSON non vérifiée."
+        )
+        return
+
+    world_coords = _parse_bbox(manifest["worldMap"]["bbox"])
+    report_coords = _parse_bbox(report_bbox)
+
+    if any(
+        abs(actual - expected) > coord_tolerance
+        for actual, expected in zip(report_coords, world_coords)
+    ):
+        raise SystemExit(
+            "[ERREUR] Le pack GeoJSON ne couvre pas la bbox worldmap. "
+            f"Extraction : {report_bbox} ; worldMap.bbox attendue : "
+            f"{manifest['worldMap']['bbox']}. Relancez extract_zoning.py avec "
+            "--bbox <bbox worldmap 57,344 km> (principe du bundle Paris)."
+        )
+
+    print("[OK] Bbox du pack GeoJSON alignée sur la bbox worldmap.")
+
+
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -577,6 +634,7 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     manifest = build_manifest(args)
     validate_manifest_invariants(manifest)
+    validate_geojson_extraction_bbox(repo_root, manifest)
 
     out_path = resolve_repo_path(repo_root, manifest["paths"]["bundleManifest"])
     write_json(out_path, manifest)
@@ -609,5 +667,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

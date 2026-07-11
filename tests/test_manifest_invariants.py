@@ -15,6 +15,7 @@ if str(TOOLS) not in sys.path:
 
 from write_cs2_bundle_manifest import (  # noqa: E402
     build_manifest,
+    validate_geojson_extraction_bbox,
     validate_manifest_invariants,
 )
 
@@ -105,3 +106,41 @@ def test_bbox_span_inconsistent_with_size_is_rejected() -> None:
     manifest["worldMap"]["sizeKm"] = 99.0  # bbox inchangée (~57 km)
     with pytest.raises(SystemExit, match="incohérente avec sizeKm"):
         validate_manifest_invariants(manifest)
+
+
+def _write_extraction_report(tmp_path: Path, manifest: dict, bbox: str) -> None:
+    import json
+
+    report_rel = manifest["geojson"]["extractionReport"].replace("\\", "/")
+    if report_rel.startswith("./"):
+        report_rel = report_rel[2:]
+    report_path = tmp_path / report_rel
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps({"bbox": bbox, "bboxOrder": "south,west,north,east"}),
+        encoding="utf-8",
+    )
+
+
+def test_geojson_extraction_on_worldmap_bbox_passes(tmp_path: Path) -> None:
+    # Principe « bundle Paris » : extraction GeoJSON = bbox worldmap (57,344 km).
+    manifest = build_manifest(make_args())
+    _write_extraction_report(tmp_path, manifest, manifest["worldMap"]["bbox"])
+    # Ne doit pas lever.
+    validate_geojson_extraction_bbox(tmp_path, manifest)
+
+
+def test_geojson_extraction_on_heightmap_bbox_is_rejected(tmp_path: Path) -> None:
+    # Reproduit le bug observé sur toutes les villes hors Paris :
+    # pack GeoJSON extrait sur la bbox heightmap (14,336 km).
+    manifest = build_manifest(make_args())
+    _write_extraction_report(tmp_path, manifest, manifest["heightmap"]["bbox"])
+    with pytest.raises(SystemExit, match="worldmap"):
+        validate_geojson_extraction_bbox(tmp_path, manifest)
+
+
+def test_geojson_extraction_missing_report_only_warns(tmp_path: Path, capsys) -> None:
+    manifest = build_manifest(make_args())
+    # Pas de rapport écrit : simple avertissement, pas d'échec.
+    validate_geojson_extraction_bbox(tmp_path, manifest)
+    assert "AVERTISSEMENT" in capsys.readouterr().out
