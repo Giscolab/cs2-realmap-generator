@@ -15,6 +15,7 @@ if str(TOOLS) not in sys.path:
 
 from write_cs2_bundle_manifest import (  # noqa: E402
     build_manifest,
+    collect_referenced_paths,
     validate_geojson_extraction_bbox,
     validate_manifest_invariants,
 )
@@ -66,6 +67,14 @@ def test_build_manifest_png_names_carry_correct_sizes() -> None:
     manifest = build_manifest(make_args())
     assert manifest["paths"]["worldmapPng"].endswith("_57.344.png")
     assert manifest["paths"]["heightmapPng"].endswith("_14.336.png")
+
+
+def test_manifest_declares_optional_railways_source() -> None:
+    manifest = build_manifest(make_args())
+    railways_path = manifest["geojson"]["railways"]
+
+    assert railways_path.endswith("\\geojson\\railways.geojson")
+    assert railways_path not in collect_referenced_paths(manifest)
 
 
 def test_valid_manifest_passes_invariants() -> None:

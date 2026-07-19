@@ -36,6 +36,7 @@ Le projet sert à générer des bundles contenant notamment :
 
 - des couches GeoJSON extraites depuis OpenStreetMap ;
 - des routes, chemins, surfaces d’eau, lignes d’eau et zones d’usage ;
+- un calque ferroviaire autonome dans `geojson/railways.geojson` ;
 - des couches de services en points (9 familles : éducation, incendie, médical, parcs, électricité, déchets, transport, eau, communications) ;
 - des PNG `worldmap` et `heightmap` compatibles avec le workflow CS2 ;
 - un `manifest.json` décrivant le bundle ;
@@ -44,6 +45,10 @@ Le projet sert à générer des bundles contenant notamment :
 - un visualiseur Leaflet pour vérifier les données avant usage dans le jeu.
 
 Le projet ne fournit pas un zonage administratif officiel. Il produit une interprétation technique, vérifiable et exploitable des données OpenStreetMap disponibles.
+
+### Calque ferroviaire V1
+
+`exports/bundles/<bundle_id>/geojson_pack/geojson/railways.geojson` est l’unique source des voies `rail`, `narrow_gauge`, `tram`, `light_rail` et `subway` actives. Les voies de service `yard`, `siding`, `spur` et `crossover` restent dans ce même fichier ; `light_rail` conserve une catégorie distincte du tramway. Ce GeoJSON fournit exclusivement un plan visuel projeté sur le terrain : aucun import, prefab, spawner ou changement du réseau du jeu n’est généré.
 
 ---
 

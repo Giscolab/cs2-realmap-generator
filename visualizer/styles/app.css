@@ -1024,6 +1024,240 @@ body.panel-collapsed .panel-toggle::after {
 }
 
 /* ========================================================================
+   Réseau ferroviaire — calque visuel indépendant
+   ======================================================================== */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.railway-layer {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-strong);
+}
+
+.railway-heading h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+}
+
+.railway-message {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-inset);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.railway-message[hidden] {
+  display: none;
+}
+
+.railway-controls {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.railway-controls[disabled] {
+  opacity: 0.55;
+}
+
+.railway-master,
+.railway-filter {
+  cursor: pointer;
+  user-select: none;
+}
+
+.railway-master {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  margin-bottom: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1px solid rgba(var(--color-neon-rgb), 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--color-neon-rgb), 0.07);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.railway-controls input[type="checkbox"] {
+  accent-color: var(--color-accent-neon);
+}
+
+.railway-range-grid {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.railway-range {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.railway-range > span {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.railway-range output {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.railway-range input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-accent-neon);
+  cursor: pointer;
+}
+
+.railway-filters {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-border);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.railway-filter {
+  display: grid;
+  grid-template-columns: 16px 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  background: var(--color-surface-inset);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.railway-filter:hover {
+  background: rgba(var(--color-neon-rgb), 0.05);
+  color: var(--color-text);
+}
+
+.railway-filter-swatch {
+  width: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--railway-color);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--railway-color), transparent 35%);
+}
+
+.railway-tunnel-swatch {
+  width: 12px;
+  height: 0;
+  border-top: 2px dashed var(--color-text-soft);
+}
+
+.railway-filter-name {
+  min-width: 0;
+}
+
+.railway-count {
+  min-width: 34px;
+  color: var(--color-accent-warm);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.railway-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid rgba(var(--color-accent-warm-rgb), 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(var(--color-accent-warm-rgb), 0.06);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.railway-total strong {
+  color: var(--color-accent-warm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.railway-notice {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.railway-controls.is-network-hidden .railway-range-grid,
+.railway-controls.is-network-hidden .railway-filters,
+.railway-controls.is-network-hidden .railway-total {
+  opacity: 0.5;
+}
+
+.railway-popup-note {
+  margin-bottom: var(--space-3);
+}
+
+.railway-popup-facts {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.railway-popup-facts div {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.75fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.railway-popup-facts dt {
+  color: var(--color-text-soft);
+}
+
+.railway-popup-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ========================================================================
    Section Informations (helper CS2) — champs et readouts Figma
    ======================================================================== */
 

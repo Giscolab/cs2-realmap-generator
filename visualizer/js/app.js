@@ -132,6 +132,17 @@
           packIndexPath: packData ? packData.indexPath : ""
         }).render();
       }
+
+      var railwayController = App.RailwayController ? App.RailwayController.create({
+        map: mapController.map,
+        packIndexPath: packData ? packData.indexPath : "",
+        fitWhenLoaded: !dataset.hasRenderableData
+      }) : null;
+
+      if (railwayController) {
+        railwayController.render();
+      }
+
       showEmptyState(dataset);
       hideLoading();
 
@@ -142,6 +153,7 @@
         overlayController: overlayController,
         cs2MapHelper: cs2MapHelper,
         overlayExporter: overlayExporter,
+        railwayController: railwayController,
         packData: packData
       };
 

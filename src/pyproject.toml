@@ -24,6 +24,7 @@ py-modules = [
     "country_codes",
     "cs2_zones",
     "overpass_client",
+    "railways",
     "road_categories",
     "service_families",
 ]

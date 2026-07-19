@@ -295,6 +295,82 @@
             <button id="export-overlay-png" type="button" class="control-button">Exporter PNG</button>
           </div>
           <div id="layer-controls" class="layer-list" role="list"></div>
+
+          <section class="railway-layer" aria-labelledby="railway-title">
+            <div class="section-heading railway-heading">
+              <h3 id="railway-title">Réseau ferroviaire</h3>
+              <span id="railway-status" class="section-meta" aria-live="polite">En attente</span>
+            </div>
+
+            <p id="railway-message" class="railway-message" aria-live="polite">
+              Chargez un bundle pour afficher le réseau ferroviaire.
+            </p>
+
+            <fieldset id="railway-controls" class="railway-controls" disabled>
+              <legend class="sr-only">Affichage du réseau ferroviaire</legend>
+
+              <label class="railway-master" for="railway-visible">
+                <input id="railway-visible" type="checkbox" checked>
+                <span>Afficher le réseau</span>
+              </label>
+
+              <div class="railway-range-grid">
+                <label class="railway-range" for="railway-opacity">
+                  <span>Opacité <output id="railway-opacity-value" for="railway-opacity">90 %</output></span>
+                  <input id="railway-opacity" type="range" min="10" max="100" step="5" value="90">
+                </label>
+                <label class="railway-range" for="railway-thickness">
+                  <span>Épaisseur <output id="railway-thickness-value" for="railway-thickness">3 px</output></span>
+                  <input id="railway-thickness" type="range" min="0.5" max="8" step="0.5" value="3">
+                </label>
+              </div>
+
+              <div class="railway-filters" role="group" aria-label="Filtres ferroviaires">
+                <label class="railway-filter" style="--railway-color: #f8fafc;">
+                  <input type="checkbox" data-railway-category="train" checked>
+                  <span class="railway-filter-swatch" aria-hidden="true"></span>
+                  <span class="railway-filter-name">Train</span>
+                  <span id="railway-count-train" class="railway-count">0</span>
+                </label>
+                <label class="railway-filter" style="--railway-color: #f59e0b;">
+                  <input type="checkbox" data-railway-category="tram" checked>
+                  <span class="railway-filter-swatch" aria-hidden="true"></span>
+                  <span class="railway-filter-name">Tramway</span>
+                  <span id="railway-count-tram" class="railway-count">0</span>
+                </label>
+                <label class="railway-filter" style="--railway-color: #22d3ee;">
+                  <input type="checkbox" data-railway-category="light_rail" checked>
+                  <span class="railway-filter-swatch" aria-hidden="true"></span>
+                  <span class="railway-filter-name">Métro léger</span>
+                  <span id="railway-count-light-rail" class="railway-count">0</span>
+                </label>
+                <label class="railway-filter" style="--railway-color: #a78bfa;">
+                  <input type="checkbox" data-railway-category="subway" checked>
+                  <span class="railway-filter-swatch" aria-hidden="true"></span>
+                  <span class="railway-filter-name">Métro</span>
+                  <span id="railway-count-subway" class="railway-count">0</span>
+                </label>
+                <label class="railway-filter" style="--railway-color: #94a3b8;">
+                  <input type="checkbox" data-railway-category="service" checked>
+                  <span class="railway-filter-swatch" aria-hidden="true"></span>
+                  <span class="railway-filter-name">Voies de service</span>
+                  <span id="railway-count-service" class="railway-count">0</span>
+                </label>
+                <label class="railway-filter railway-filter-tunnels">
+                  <input id="railway-tunnels" type="checkbox" checked>
+                  <span class="railway-tunnel-swatch" aria-hidden="true"></span>
+                  <span class="railway-filter-name">Tunnels</span>
+                  <span id="railway-count-tunnels" class="railway-count">0</span>
+                </label>
+              </div>
+
+              <div class="railway-total">
+                <span>Total</span>
+                <strong id="railway-count-total">0</strong>
+              </div>
+              <p class="railway-notice">Plan visuel uniquement — aucun placement automatique.</p>
+            </fieldset>
+          </section>
         </section>
 
         <section class="services-section panel-view" id="services-panel" role="tabpanel" aria-labelledby="services-title" hidden>
@@ -362,6 +438,7 @@
   <script src="./js/cs2-map-helper.js"></script>
   <script src="./js/bundle-catalog-controller.js"></script>
   <script src="./js/services-controller.js"></script>
+  <script src="./js/railway-controller.js"></script>
   <script src="./js/overlay-exporter.js"></script>
   <script src="./js/app.js"></script>
   <script src="./js/ui-chrome.js"></script>

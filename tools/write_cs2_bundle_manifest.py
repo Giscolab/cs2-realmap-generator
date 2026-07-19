@@ -276,6 +276,9 @@ def build_manifest(args: argparse.Namespace) -> dict:
             "roadsMajor": geojson_dir + "\\geojson\\roads_major_clipped.geojson",
             "roadsDriveable": geojson_dir + "\\geojson\\roads_driveable_clipped.geojson",
             "paths": geojson_dir + "\\geojson\\paths.geojson",
+            # Optionnel pour préserver le chargement et la validation des bundles
+            # historiques qui précèdent le calque ferroviaire visuel.
+            "railways": geojson_dir + "\\geojson\\railways.geojson",
             "waterLines": geojson_dir + "\\geojson\\water_lines_clipped.geojson",
             "waterAreas": geojson_dir + "\\geojson\\water_areas_clipped.geojson",
             "layerIndex": geojson_dir + "\\reports\\layer_index.json",

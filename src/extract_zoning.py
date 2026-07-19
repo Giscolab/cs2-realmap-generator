@@ -30,6 +30,7 @@ from road_categories import (
     road_category_color,
     road_category_label,
 )
+from railways import build_railways_query, is_active_railway, railway_item
 from service_families import (
     SERVICE_FAMILIES,
     build_service_query,
@@ -593,6 +594,16 @@ def write_split_layers_pack(
             "count": len(category_features),
         })
 
+    railway_features = build_features(output.get("railways", []), "line")
+    # Source ferroviaire unique : elle est indexée, mais volontairement absente
+    # de all_features.geojson et n'est jamais scindée par type ou service.
+    write_layer(
+        "railways.geojson",
+        railway_features,
+        "LineString",
+        base_layer=False,
+    )
+
     path_features = build_features(output.get("paths", []), "line")
     write_layer("paths.geojson", path_features, "LineString", base_layer=True)
 
@@ -639,6 +650,7 @@ def write_split_layers_pack(
         "notes": [
             "Les coordonnées GeoJSON sont exportées en ordre standard [longitude, latitude].",
             "Les fichiers water_lines_clipped.geojson et water_areas_clipped.geojson sont produits depuis les tags OSM waterway/natural/water/landuse.",
+            "railways.geojson est un calque visuel indépendant et sa géométrie n'est pas dupliquée dans all_features.geojson.",
         ],
     }
 
@@ -875,13 +887,17 @@ def main():
         raw[cat] = result.get("elements", [])
         print(f"      {cat}: {len(raw[cat])} éléments")
 
-    print("\n[3/4] Téléchargement des routes et chemins...")
+    print("\n[3/4] Téléchargement des routes, chemins et voies ferrées...")
     roads_data = query_with_retry(build_roads_query(bbox), "roads")
     raw["roads"] = roads_data.get("elements", [])
     print(f"      roads: {len(raw['roads'])} éléments")
     paths_data = query_with_retry(build_paths_query(bbox), "paths")
     raw["paths"] = paths_data.get("elements", [])
     print(f"      paths: {len(raw['paths'])} éléments")
+
+    railways_data = query_with_retry(build_railways_query(bbox), "railways")
+    raw["railways"] = railways_data.get("elements", [])
+    print(f"      railways: {len(raw['railways'])} éléments")
 
     water_lines_data = query_with_retry(build_water_lines_query(bbox), "water_lines")
     raw["water_lines"] = water_lines_data.get("elements", [])
@@ -891,16 +907,19 @@ def main():
     raw["water_areas"] = water_areas_data.get("elements", [])
     print(f"      water_areas: {len(raw['water_areas'])} éléments")
 
-    print("\n[4/4] Classification des zones, routes et chemins...")
+    print("\n[4/4] Classification des zones et couches linéaires...")
 
     output: dict[str, list] = {cat: [] for cat in zone_categories}
     output["roads"] = []
     output["paths"] = []
+    output["railways"] = []
     output["water_lines"] = []
     output["water_areas"] = []
     skipped = 0
     skipped_roads = 0
     skipped_paths = 0
+    skipped_railways = 0
+    excluded_inactive_railways = 0
     skipped_water_lines = 0
     skipped_water_areas = 0
     commercial_ids: set[int] = set()
@@ -1079,6 +1098,20 @@ def main():
             "roadColor": road_category_color("pathway"),
         })
 
+    for el in raw["railways"]:
+        tags = el.get("tags") or {}
+
+        if not is_active_railway(tags):
+            excluded_inactive_railways += 1
+            continue
+
+        item = railway_item(el)
+        if item is None:
+            skipped_railways += 1
+            continue
+
+        output["railways"].append(item)
+
     for el in raw["water_lines"]:
         tags = el.get("tags") or {}
         coords = extract_line_coords(el)
@@ -1126,6 +1159,7 @@ def main():
     com = output["commercial"]
     roads = output["roads"]
     paths = output["paths"]
+    railways = output["railways"]
 
     print(f"\n  Résidentiel haut/moyen/bas : "
           f"{sum(1 for r in res if r['zone'] == 'high')} / "
@@ -1141,11 +1175,14 @@ def main():
 
     print(f"  Routes récupérées          : {len(roads)}")
     print(f"  Chemins/piéton récupérés   : {len(paths)}")
+    print(f"  Voies ferrées récupérées   : {len(railways)}")
     print(f"  Lignes d’eau récupérées    : {len(output['water_lines'])}")
     print(f"  Zones d’eau récupérées     : {len(output['water_areas'])}")
     print(f"  Ignorés sans géométrie     : {skipped}")
     print(f"  Routes ignorées sans géom. : {skipped_roads}")
     print(f"  Chemins ignorés sans géom. : {skipped_paths}")
+    print(f"  Voies ferrées sans géom.   : {skipped_railways}")
+    print(f"  Voies ferrées inactives    : {excluded_inactive_railways}")
     print(f"  Lignes eau sans géom.      : {skipped_water_lines}")
     print(f"  Zones eau sans géom.       : {skipped_water_areas}")
     print(f"  TOTAL                      : {total}")
@@ -1163,9 +1200,11 @@ def main():
         "skippedPolygonsWithoutGeometry": skipped,
         "skippedRoadsWithoutGeometry": skipped_roads,
         "skippedPathsWithoutGeometry": skipped_paths,
+        "skippedRailwaysWithoutGeometry": skipped_railways,
+        "excludedInactiveRailways": excluded_inactive_railways,
         "counts": {
             cat: len(output.get(cat, []))
-            for cat in zone_categories + ["roads", "paths", "water_lines", "water_areas"]
+            for cat in zone_categories + ["roads", "paths", "railways", "water_lines", "water_areas"]
         },
     }
 
