@@ -36,6 +36,7 @@ from service_families import (
     build_service_query,
     classify_service_element,
     service_point,
+    service_tags,
     source_tag,
     subcategory_labels,
 )
@@ -728,11 +729,7 @@ def download_service_families(bbox: str) -> dict:
                     "subcategoryLabel": sub_labels.get(subcategory, subcategory),
                     "sourceTag": source_tag(family, tags),
                     "point": point,
-                    "tags": {
-                        k: tags[k]
-                        for k in ("amenity", "leisure", "tourism", "office", "landuse", "emergency", "name")
-                        if tags.get(k)
-                    },
+                    "tags": service_tags(tags),
                 })
 
         services[family["key"]] = items
@@ -922,11 +919,26 @@ def main():
     excluded_inactive_railways = 0
     skipped_water_lines = 0
     skipped_water_areas = 0
-    commercial_ids: set[int] = set()
+    # Un même objet OSM peut répondre à plusieurs requêtes (par exemple un
+    # bâtiment mixed_use portant aussi shop=*).  La clé inclut le type OSM :
+    # les identifiants node/way/relation ne partagent pas le même espace.
+    def element_key(element: dict) -> tuple[str, int] | None:
+        element_id = element.get("id")
+        if element_id is None:
+            return None
+        return (str(element.get("type") or ""), int(element_id))
+
+    commercial_ids: set[tuple[str, int]] = set()
+    mixed_ids = {
+        key
+        for element in raw["mixed"]
+        if (key := element_key(element)) is not None and extract_coords(element)
+    }
 
     for el in raw["commercial"]:
-        if "id" in el:
-            commercial_ids.add(el["id"])
+        key = element_key(el)
+        if key in mixed_ids:
+            continue
 
         tags = el.get("tags") or {}
         coords = extract_coords(el)
@@ -934,6 +946,9 @@ def main():
         if not coords:
             skipped += 1
             continue
+
+        if key is not None:
+            commercial_ids.add(key)
 
         zone = classify_commercial(tags)
 
@@ -946,6 +961,9 @@ def main():
         })
 
     for el in raw["residential"]:
+        if element_key(el) in mixed_ids:
+            continue
+
         tags = el.get("tags") or {}
         coords = extract_coords(el)
 
@@ -965,6 +983,9 @@ def main():
         })
 
     for el in raw["industrial"]:
+        if element_key(el) in mixed_ids:
+            continue
+
         tags = el.get("tags") or {}
         coords = extract_coords(el)
 
@@ -981,6 +1002,9 @@ def main():
         })
 
     for el in raw["retail"]:
+        if element_key(el) in mixed_ids:
+            continue
+
         tags = el.get("tags") or {}
         coords = extract_coords(el)
 
@@ -997,6 +1021,9 @@ def main():
         })
 
     for el in raw["parking"]:
+        if element_key(el) in mixed_ids:
+            continue
+
         tags = el.get("tags") or {}
         coords = extract_coords(el)
 
@@ -1015,7 +1042,8 @@ def main():
         })
 
     for el in raw["office"]:
-        if el.get("id") in commercial_ids:
+        key = element_key(el)
+        if key in mixed_ids or key in commercial_ids:
             continue
 
         tags = el.get("tags") or {}

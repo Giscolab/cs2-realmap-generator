@@ -66,6 +66,10 @@ out geom;
 (
   way["landuse"="commercial"]({bbox});
   relation["landuse"="commercial"]({bbox});
+  way["building"~"^(commercial|retail|mall)$"]({bbox});
+  relation["building"~"^(commercial|retail|mall)$"]({bbox});
+  way["shop"~"^(mall|department_store)$"]({bbox});
+  relation["shop"~"^(mall|department_store)$"]({bbox});
 );
 out geom;
 """.strip(),
@@ -113,10 +117,14 @@ out geom;
         "mixed": f"""
 [out:json][timeout:180];
 (
-  way["landuse"="mixed"]({bbox});
-  relation["landuse"="mixed"]({bbox});
-  way["building"="mixed_use"]({bbox});
-  relation["building"="mixed_use"]({bbox});
+  way["landuse"~"^(mixed|mixed_use)$"]({bbox});
+  relation["landuse"~"^(mixed|mixed_use)$"]({bbox});
+  way["building"~"^(mixed|mixed-use|mixed_use)$"]({bbox});
+  relation["building"~"^(mixed|mixed-use|mixed_use)$"]({bbox});
+  way["mixed_use"="yes"]({bbox});
+  relation["mixed_use"="yes"]({bbox});
+  way["building:use"~"(apartments|residential)"]["building:use"~"(commercial|office|retail|shop)"]({bbox});
+  relation["building:use"~"(apartments|residential)"]["building:use"~"(commercial|office|retail|shop)"]({bbox});
 );
 out geom;
 """.strip(),
