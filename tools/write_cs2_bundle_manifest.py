@@ -289,6 +289,9 @@ def build_manifest(args: argparse.Namespace) -> dict:
         },
         "timelineMod": {
             "configPath": timeline_config_path,
+            "useBundleIndex": True,
+            "bundlesRoot": "data\\exports\\bundles",
+            "activeBundleId": bundle_id,
             "useGeoJsonCenter": False,
             "originLon": center_lon,
             "originLat": center_lat,
@@ -308,6 +311,9 @@ def build_manifest(args: argparse.Namespace) -> dict:
             "roadsDriveableGeoJson": "roads_driveable_clipped.geojson",
             "waterLinesGeoJson": "water_lines_clipped.geojson",
             "waterAreasGeoJson": "water_areas_clipped.geojson",
+            "railwaysGeoJson": "railways.geojson",
+            "servicesIndex": "services_index.json",
+            "servicesDirectory": "services",
         },
     }
 
@@ -322,39 +328,66 @@ def resolve_repo_path(repo_root: Path, value: str) -> Path:
 
 
 def collect_referenced_paths(manifest: dict) -> list[str]:
+    geojson = manifest["geojson"]
+    geojson_dir = manifest["paths"]["geojsonDir"]
+    geojson_layer_dir = geojson_dir + "\\geojson"
+    reports_dir = geojson_dir + "\\reports"
+
     paths = [
         manifest["paths"]["pngDir"],
         manifest["paths"]["geojsonDir"],
         manifest["paths"]["worldmapPng"],
         manifest["paths"]["heightmapPng"],
-        manifest["geojson"]["roadsMajor"],
-        manifest["geojson"]["roadsDriveable"],
-        manifest["geojson"]["waterLines"],
-        manifest["geojson"]["waterAreas"],
-        manifest["geojson"]["layerIndex"],
-        manifest["geojson"]["extractionReport"],
+        geojson.get("roadsMajor", geojson_layer_dir + "\\roads_major_clipped.geojson"),
+        geojson.get("roadsDriveable", geojson_layer_dir + "\\roads_driveable_clipped.geojson"),
+        geojson.get("paths", geojson_layer_dir + "\\paths.geojson"),
+        geojson.get("railways", geojson_layer_dir + "\\railways.geojson"),
+        geojson.get("zoningPolygons", geojson_layer_dir + "\\zoning_polygons.geojson"),
+        geojson.get("waterLines", geojson_layer_dir + "\\water_lines_clipped.geojson"),
+        geojson.get("waterAreas", geojson_layer_dir + "\\water_areas_clipped.geojson"),
+        geojson.get("layerIndex", reports_dir + "\\layer_index.json"),
+        geojson.get("extractionReport", reports_dir + "\\extraction_report.json"),
+        geojson.get("roadsIndex", reports_dir + "\\roads_index.json"),
+        geojson.get("servicesIndex", reports_dir + "\\services_index.json"),
     ]
+
+    services = geojson.get("services") or {}
+    for family in SERVICE_FAMILIES:
+        key = family["key"]
+        paths.append(
+            services.get(key, geojson_layer_dir + "\\services\\" + key + ".geojson")
+        )
 
     return paths
 
 
 def check_existing(repo_root: Path, manifest: dict) -> int:
     missing = []
+    empty = []
 
     for value in collect_referenced_paths(manifest):
         path = resolve_repo_path(repo_root, value)
 
         if not path.exists():
             missing.append(value)
+        elif path.is_file() and path.stat().st_size == 0:
+            empty.append(value)
 
-    if not missing:
-        print("[OK] Tous les fichiers principaux référencés existent.")
+    if not missing and not empty:
+        print("[OK] Bundle complet : PNG, couches GeoJSON, voies ferrées, services et rapports existent.")
         return 0
 
-    print("[ERREUR] Fichiers manquants :")
+    if missing:
+        print("[ERREUR] Fichiers manquants :")
 
-    for value in missing:
-        print(f"  - {value}")
+        for value in missing:
+            print(f"  - {value}")
+
+    if empty:
+        print("[ERREUR] Fichiers vides :")
+
+        for value in empty:
+            print(f"  - {value}")
 
     return 1
 
@@ -570,6 +603,10 @@ def write_bundle_index(repo_root: Path, manifest: dict) -> Path:
 
     data["schemaVersion"] = 1
     data["version"] = 1
+    # Le pointeur est explicite : après synchronisation de l'index dans
+    # CityTimelineMod, le mod sait quel bundle vient d'être publié. Il ne doit
+    # jamais choisir arbitrairement le premier dossier ou un ancien bundle.
+    data["activeBundleId"] = entry["id"]
     data["bundles"] = sorted(
         by_id.values(),
         key=lambda item: (

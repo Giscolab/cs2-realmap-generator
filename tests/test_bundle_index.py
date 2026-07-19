@@ -51,6 +51,17 @@ def test_index_is_valid_json_with_expected_schema() -> None:
     assert isinstance(data.get("bundles"), list)
 
 
+def test_index_has_an_explicit_existing_active_bundle() -> None:
+    data = _load_index()
+    active_bundle_id = data.get("activeBundleId")
+    indexed = {entry["id"] for entry in data["bundles"]}
+
+    assert active_bundle_id, "activeBundleId absent de bundle_index.json"
+    assert active_bundle_id in indexed, (
+        f"activeBundleId={active_bundle_id!r} ne correspond à aucune entrée de l'index"
+    )
+
+
 def test_every_bundle_on_disk_is_indexed_and_vice_versa() -> None:
     data = _load_index()
     indexed = {entry["id"] for entry in data["bundles"]}

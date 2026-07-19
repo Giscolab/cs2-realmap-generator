@@ -69,12 +69,24 @@ def test_build_manifest_png_names_carry_correct_sizes() -> None:
     assert manifest["paths"]["heightmapPng"].endswith("_14.336.png")
 
 
-def test_manifest_declares_optional_railways_source() -> None:
+def test_complete_bundle_check_includes_railways_and_services() -> None:
     manifest = build_manifest(make_args())
     railways_path = manifest["geojson"]["railways"]
+    referenced = collect_referenced_paths(manifest)
 
     assert railways_path.endswith("\\geojson\\railways.geojson")
-    assert railways_path not in collect_referenced_paths(manifest)
+    assert railways_path in referenced
+    assert manifest["geojson"]["servicesIndex"] in referenced
+    assert set(manifest["geojson"]["services"].values()).issubset(referenced)
+
+
+def test_timeline_config_selects_synced_bundle_root_explicitly() -> None:
+    manifest = build_manifest(make_args())
+    timeline = manifest["timelineMod"]
+
+    assert timeline["useBundleIndex"] is True
+    assert timeline["bundlesRoot"] == "data\\exports\\bundles"
+    assert timeline["activeBundleId"] == manifest["bundle"]["id"]
 
 
 def test_valid_manifest_passes_invariants() -> None:
