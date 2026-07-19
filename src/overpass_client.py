@@ -8,8 +8,14 @@ Client Overpass API avec :
 - messages lisibles en console.
 """
 
+import json
+import os
+import socket
+import ssl
 import time
-import requests
+import urllib.error
+import urllib.parse
+import urllib.request
 
 ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -22,6 +28,43 @@ HEADERS = {
     "User-Agent": "CS2-Realmap-Generator/1.0 (OpenStreetMap Overpass client)",
     "Content-Type": "application/x-www-form-urlencoded",
 }
+
+
+def _create_ssl_context() -> ssl.SSLContext:
+    """
+    Construit un contexte TLS vérifié.
+
+    Certaines distributions Python Windows autonomes n'embarquent aucun
+    fichier CA et `urllib` échoue alors sur tous les endpoints HTTPS. On charge
+    explicitement le magasin ROOT de Windows, sans désactiver la vérification.
+    """
+    context = ssl.create_default_context()
+
+    if os.name == "nt" and hasattr(ssl, "enum_certificates"):
+        for certificate, encoding, _trust in ssl.enum_certificates("ROOT"):
+            if encoding != "x509_asn":
+                continue
+            try:
+                context.load_verify_locations(
+                    cadata=ssl.DER_cert_to_PEM_cert(certificate)
+                )
+            except (ssl.SSLError, ValueError):
+                # Un certificat système illisible ne doit pas empêcher le
+                # chargement des autres autorités de confiance.
+                continue
+
+    # Python 3.13+ active VERIFY_X509_STRICT par défaut. Plusieurs certificats
+    # racine Windows historiques restent sûrs pour la chaîne/nom d'hôte mais
+    # n'ont pas l'extension Basic Constraints marquée « critical ». Désactiver
+    # ce contrôle de forme rétablit la compatibilité Windows tout en conservant
+    # CERT_REQUIRED et la vérification du nom d'hôte.
+    if hasattr(ssl, "VERIFY_X509_STRICT"):
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+    return context
+
+
+SSL_CONTEXT = _create_ssl_context()
 
 ROAD_HIGHWAY_VALUES = "|".join((
     "motorway",
@@ -88,24 +131,36 @@ def query_with_retry(query: str, label: str, max_attempts: int = 3) -> dict:
             try:
                 print(f"  [{label}] {host} (essai {attempt})... ", end="", flush=True)
 
-                response = requests.post(
+                payload = urllib.parse.urlencode({"data": query}).encode("utf-8")
+                request = urllib.request.Request(
                     endpoint,
-                    data={"data": query},
+                    data=payload,
                     headers=HEADERS,
-                    timeout=200,
+                    method="POST",
                 )
 
-                if response.status_code == 200:
-                    size_kb = len(response.content) / 1024
+                with urllib.request.urlopen(
+                    request,
+                    timeout=200,
+                    context=SSL_CONTEXT,
+                ) as response:
+                    content = response.read()
+                    status_code = response.getcode()
+
+                if status_code == 200:
+                    size_kb = len(content) / 1024
                     print(f"OK ({size_kb:.0f} Ko)")
-                    return response.json()
+                    return json.loads(content.decode("utf-8"))
 
-                print(f"HTTP {response.status_code}")
+                print(f"HTTP {status_code}")
 
-            except requests.exceptions.Timeout:
+            except (TimeoutError, socket.timeout):
                 print("TIMEOUT")
 
-            except requests.exceptions.RequestException as error:
+            except urllib.error.HTTPError as error:
+                print(f"HTTP {error.code}")
+
+            except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError) as error:
                 print(f"ERREUR : {str(error)[:80]}")
 
             time.sleep(wait_seconds)
