@@ -28,8 +28,16 @@
     },
     DATA_PATHS: function () {
       return typeof DATA_PATHS === "undefined" ? [] : DATA_PATHS;
+    },
+    DATA_WATER_LINES: function () {
+      return typeof DATA_WATER_LINES === "undefined" ? [] : DATA_WATER_LINES;
+    },
+    DATA_WATER_AREAS: function () {
+      return typeof DATA_WATER_AREAS === "undefined" ? [] : DATA_WATER_AREAS;
     }
   };
+
+  var EXPECTED_SERVICE_FAMILY_COUNT = 9;
 
   var ROAD_CATEGORY_BY_HIGHWAY = {
     motorway: "highway",
@@ -50,6 +58,8 @@
     steps: "pathway",
     cycleway: "pathway",
     bridleway: "pathway",
+    corridor: "pathway",
+    platform: "pathway",
     unclassified: "gravel_road",
     service: "gravel_road",
     road: "gravel_road",
@@ -66,15 +76,101 @@
   }
 
   function readSourceData(source, packData) {
-    if (
-      packData &&
-      packData.sources &&
-      Object.prototype.hasOwnProperty.call(packData.sources, source.key)
-    ) {
-      return toArray(packData.sources[source.key]);
+    if (packData && packData.mode === "pack") {
+      if (
+        packData.sources &&
+        Object.prototype.hasOwnProperty.call(packData.sources, source.key)
+      ) {
+        return toArray(packData.sources[source.key]);
+      }
+
+      // Ne mélange jamais un bundle moderne partiel avec d'anciennes variables
+      // globales éventuellement encore présentes dans la page.
+      return [];
     }
 
     return readGlobalArray(source.globalName);
+  }
+
+  function sourceIsAvailable(source, packData, data) {
+    if (packData && packData.mode === "pack") {
+      return Boolean(
+        packData.sources &&
+        Object.prototype.hasOwnProperty.call(packData.sources, source.key)
+      );
+    }
+
+    // Les anciens packs globaux ne permettent pas de distinguer un tableau
+    // volontairement vide d'une variable absente. On conserve leur comportement
+    // historique, tandis que le contrat indexe explicitement cette information
+    // pour les bundles modernes.
+    return data.length > 0;
+  }
+
+  function indexedLayer(packData, key) {
+    var layers = packData && packData.index && Array.isArray(packData.index.layers)
+      ? packData.index.layers
+      : [];
+    return layers.find(function (entry) {
+      return entry && entry.name === key;
+    }) || null;
+  }
+
+  function nonNegativeCount(value) {
+    var count = Number(value);
+    return Number.isFinite(count) && count >= 0 ? count : 0;
+  }
+
+  function indexedLayerCount(packData, key) {
+    var layer = indexedLayer(packData, key);
+    var count = Number(layer && layer.count);
+    return Number.isFinite(count) && count >= 0 ? count : 0;
+  }
+
+  function aggregateIncludes(packData, sourceName) {
+    var contract = packData &&
+      packData.index &&
+      packData.index.contracts &&
+      packData.index.contracts.all_features;
+    var includes = contract && Array.isArray(contract.includes) ? contract.includes : [];
+
+    return includes.some(function (entry) {
+      var value = String(entry || "");
+      if (sourceName === "services/*") {
+        return value === "services/*" || value.indexOf("services/") === 0;
+      }
+      return value === sourceName;
+    });
+  }
+
+  function indexedServiceCount(packData) {
+    var families = packData &&
+      packData.servicesIndex &&
+      Array.isArray(packData.servicesIndex.families)
+      ? packData.servicesIndex.families
+      : [];
+
+    return families.reduce(function (total, family) {
+      return total + nonNegativeCount(family && family.count);
+    }, 0);
+  }
+
+  function indexedServiceFamilyCount(packData) {
+    var families = packData &&
+      packData.servicesIndex &&
+      Array.isArray(packData.servicesIndex.families)
+      ? packData.servicesIndex.families
+      : [];
+    var seen = {};
+
+    families.forEach(function (family) {
+      var key = String(family && family.key || "");
+      if (key) {
+        seen[key] = true;
+      }
+    });
+
+    return Object.keys(seen).length;
   }
 
   function normalizeCoord(coord) {
@@ -200,6 +296,7 @@
 
     config.dataSources.forEach(function (source) {
       var data = readSourceData(source, packData);
+      var available = sourceIsAvailable(source, packData, data);
 
       sources[source.key] = {
         key: source.key,
@@ -207,10 +304,12 @@
         label: source.label,
         features: data,
         count: data.length,
-        missing: data.length === 0
+        available: available,
+        empty: available && data.length === 0,
+        missing: !available
       };
 
-      if (!data.length) {
+      if (!available) {
         missingSources.push(source.globalName);
       }
     });
@@ -252,6 +351,9 @@
       return {
         definition: layer,
         source: source,
+        available: Boolean(source.available),
+        empty: Boolean(source.available) && features.length === 0,
+        missing: !source.available,
         rawCount: rawFeatures.length,
         count: features.length,
         features: features,
@@ -266,6 +368,33 @@
     var totalRenderable = layers.reduce(function (total, layer) {
       return total + layer.count;
     }, 0);
+    var allFeaturesLayer = indexedLayer(packData, "all_features");
+    var indexedAllFeatures = indexedLayerCount(packData, "all_features");
+    var railwayLayer = indexedLayer(packData, "railways");
+    var railwayCount = indexedLayerCount(packData, "railways");
+    var serviceCount = indexedServiceCount(packData);
+    var serviceFamilyCount = indexedServiceFamilyCount(packData);
+    var allFeaturesCount = allFeaturesLayer ? indexedAllFeatures : totalRaw;
+    // Compatibilité avec d'anciens agrégats : si leur contrat déclare déjà
+    // rail/services dans all_features, ces sources ne sont pas recomptées.
+    var independentRailwayCount = aggregateIncludes(packData, "railways") ? 0 : railwayCount;
+    var independentServiceCount = aggregateIncludes(packData, "services/*") ? 0 : serviceCount;
+    var availableSourceCount = Object.keys(sources).reduce(function (total, key) {
+      return total + (sources[key].available ? 1 : 0);
+    }, 0);
+    var availableBaseLayerCount = layers.reduce(function (total, layer) {
+      return total + (layer.available ? 1 : 0);
+    }, 0);
+    var railwayAvailable = Boolean(railwayLayer);
+    var servicesIndexAvailable = Boolean(
+      packData &&
+      packData.servicesIndex &&
+      Array.isArray(packData.servicesIndex.families)
+    );
+    var availableVisualLayerCount = availableBaseLayerCount +
+      (railwayAvailable ? 1 : 0) + serviceFamilyCount;
+    var expectedVisualLayerCount = layers.length + 1 + EXPECTED_SERVICE_FAMILY_COUNT;
+    var hasBundleSources = availableSourceCount > 0 || railwayAvailable || servicesIndexAvailable;
 
     return {
       dataMode: packData && packData.mode ? packData.mode : "legacy",
@@ -273,12 +402,39 @@
       sources: sources,
       layers: layers,
       totalRaw: totalRaw,
+      totalVisualEntities: allFeaturesCount + independentRailwayCount + independentServiceCount,
       totalRenderable: totalRenderable,
-      hasData: totalRaw > 0,
+      bundleTotals: {
+        allFeatures: allFeaturesCount,
+        railways: railwayCount,
+        services: serviceCount,
+        water: sourceCountSafe(sources, "water_lines_clipped") +
+          sourceCountSafe(sources, "water_areas_clipped")
+      },
+      sourceCoverage: {
+        available: availableSourceCount,
+        expected: config.dataSources.length
+      },
+      layerCoverage: {
+        available: availableVisualLayerCount,
+        expected: expectedVisualLayerCount,
+        baseAvailable: availableBaseLayerCount,
+        baseExpected: layers.length,
+        railwayAvailable: railwayAvailable,
+        serviceFamiliesAvailable: serviceFamilyCount,
+        serviceFamiliesExpected: EXPECTED_SERVICE_FAMILY_COUNT,
+        complete: availableVisualLayerCount === expectedVisualLayerCount
+      },
+      hasBundleSources: hasBundleSources,
+      hasData: allFeaturesCount + independentRailwayCount + independentServiceCount > 0,
       hasRenderableData: totalRenderable > 0 && bounds.valid,
       missingSources: missingSources,
       bounds: bounds.valid ? [[bounds.south, bounds.west], [bounds.north, bounds.east]] : null
     };
+  }
+
+  function sourceCountSafe(sources, key) {
+    return sources[key] ? sources[key].count : 0;
   }
 
   App.DataAdapter = {

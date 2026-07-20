@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from country_codes import UnknownCountryCodeError, resolve_country_code
 from service_families import SERVICE_FAMILIES
+from validate_cs2_bundle import BundleValidationError, validate_bundle_directory
 
 
 def round_number(value: float, digits: int) -> float:
@@ -334,10 +335,15 @@ def collect_referenced_paths(manifest: dict) -> list[str]:
     reports_dir = geojson_dir + "\\reports"
 
     paths = [
+        manifest["paths"]["bundleDir"],
+        manifest["paths"]["bundleManifest"],
+        manifest["paths"]["timelineConfig"],
         manifest["paths"]["pngDir"],
         manifest["paths"]["geojsonDir"],
         manifest["paths"]["worldmapPng"],
         manifest["paths"]["heightmapPng"],
+        geojson.get("allFeatures", geojson_layer_dir + "\\all_features.geojson"),
+        geojson.get("roads", geojson_layer_dir + "\\roads.geojson"),
         geojson.get("roadsMajor", geojson_layer_dir + "\\roads_major_clipped.geojson"),
         geojson.get("roadsDriveable", geojson_layer_dir + "\\roads_driveable_clipped.geojson"),
         geojson.get("paths", geojson_layer_dir + "\\paths.geojson"),
@@ -538,10 +544,12 @@ def validate_geojson_extraction_bbox(
 
 def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    temporary = path.with_name(path.name + ".writing")
+    temporary.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    temporary.replace(path)
 
 
 def build_bundle_index_entry(manifest: dict) -> dict:
@@ -695,12 +703,32 @@ def main() -> int:
         write_json(timeline_config_path, timeline_config)
         print(f"Timeline : {timeline_config_path}")
 
+    if args.check_existing:
+        if check_existing(repo_root, manifest) != 0:
+            # Ne jamais changer activeBundleId tant que le bundle est incomplet.
+            return 1
+        try:
+            validate_bundle_directory(out_path.parent)
+        except BundleValidationError as exc:
+            print(f"[ERREUR] Contrat de bundle incomplet : {exc}")
+            return 1
+
+    index_path = None
     if not args.skip_bundle_index and not args.legacy_flat_output:
+        # Publication de activeBundleId uniquement après validation complète.
         index_path = write_bundle_index(repo_root, manifest)
         print(f"Index    : {index_path}")
 
-    if args.check_existing:
-        return check_existing(repo_root, manifest)
+    if args.check_existing and index_path is not None:
+        try:
+            validate_bundle_directory(
+                out_path.parent,
+                bundle_index_path=index_path,
+                require_active=True,
+            )
+        except BundleValidationError as exc:
+            print(f"[ERREUR] Index de bundle incohérent : {exc}")
+            return 1
 
     return 0
 

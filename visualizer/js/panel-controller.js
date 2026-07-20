@@ -84,11 +84,26 @@
     var status = byId("dataset-status");
     var dataset = context.dataset;
 
-    setText("dataset-status", dataset.hasData ? "Données chargées" : "Aucune donnée");
+    var bundleLoaded = Boolean(dataset.hasBundleSources);
+    var coverage = dataset.layerCoverage || { available: 0, expected: 0, complete: false };
+    setText(
+      "dataset-status",
+      bundleLoaded ? (dataset.hasData ? "Données chargées" : "Bundle vide chargé") : "Aucune donnée"
+    );
     setText(
       "dataset-substatus",
-      dataset.hasData ? App.Stats.formatNumber(dataset.totalRaw) + " objets détectés" : "Pack GeoJSON absent ou vide"    );
-    setText("metrics-context", dataset.hasRenderableData ? "Objets OSM exploitables" : "Mode attente de données");
+      bundleLoaded
+        ? App.Stats.formatNumber(dataset.totalVisualEntities) +
+          " entités visuelles · " + coverage.available + "/" + coverage.expected +
+          " couches disponibles"
+        : "Pack GeoJSON absent ou vide"
+    );
+    setText(
+      "metrics-context",
+      coverage.complete
+        ? "Bundle complet — 20 couches de base, rail et 9 familles de services"
+        : (bundleLoaded ? "Bundle partiel — certaines couches sont absentes" : "Mode attente de données")
+    );
 
     if (status) {
       status.classList.toggle("is-empty", !dataset.hasData);

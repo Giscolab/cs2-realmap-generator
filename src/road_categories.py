@@ -12,7 +12,7 @@ Correspondance OSM `highway` -> catégorie -> couleur :
     medium_road  Route secondaire        jaune       secondary
     small_road   Tertiaire / résidentiel blanc       tertiary, residential, living_street
     ramp         Bretelle / liaison      magenta     *_link
-    pathway      Chemin / piéton         cyan        pedestrian, footway, path, steps, cycleway, bridleway
+    pathway      Chemin / piéton         cyan        pedestrian, footway, path, steps, cycleway, bridleway, corridor, platform
     gravel_road  Route non classée       gris clair  unclassified, service, road, track + tout le reste
 
 Les classes non listées explicitement par le contrat (residential, service…)
@@ -35,7 +35,10 @@ ROAD_CATEGORIES: list[dict] = [
     {"key": "ramp", "label": "Bretelle / liaison", "color": "#ff3df5",
      "highways": ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]},
     {"key": "pathway", "label": "Chemin / piéton", "color": "#2ad4ff",
-     "highways": ["pedestrian", "footway", "path", "steps", "cycleway", "bridleway"]},
+     "highways": [
+         "pedestrian", "footway", "path", "steps", "cycleway", "bridleway",
+         "corridor", "platform",
+     ]},
     {"key": "gravel_road", "label": "Route non classée", "color": "#c7d0d9",
      "highways": ["unclassified", "service", "road", "track"]},
 ]

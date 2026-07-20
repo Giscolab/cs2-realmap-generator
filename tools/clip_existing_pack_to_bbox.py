@@ -100,6 +100,129 @@ def stats(data, south, west, north, east):
     return {"coords": total, "outside": outside}
 
 
+def update_pack_reports(
+    out_pack: Path,
+    *,
+    bbox: str,
+    generated_at: str,
+    feature_counts: dict[str, int],
+    features_by_file: dict[str, list],
+) -> None:
+    """Réaligne les trois index et le rapport sur les fichiers clippés."""
+    reports_dir = out_pack / "reports"
+
+    layer_path = reports_dir / "layer_index.json"
+    layer_index = json.loads(layer_path.read_text(encoding="utf-8"))
+    for layer in layer_index.get("layers") or []:
+        relative = str(layer.get("file") or "").replace("\\", "/")
+        if relative not in feature_counts:
+            raise RuntimeError(f"Couche indexée absente après clipping : {relative}")
+        layer["count"] = feature_counts[relative]
+    layer_index["generatedAt"] = generated_at
+    layer_index["bbox"] = bbox
+    layer_path.write_text(
+        json.dumps(layer_index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    roads_path = reports_dir / "roads_index.json"
+    roads_index = json.loads(roads_path.read_text(encoding="utf-8"))
+    for category in roads_index.get("categories") or []:
+        relative = str(category.get("file") or "").replace("\\", "/")
+        if relative not in feature_counts:
+            raise RuntimeError(f"Catégorie routière absente après clipping : {relative}")
+        category["count"] = feature_counts[relative]
+    roads_index["generatedAt"] = generated_at
+    roads_index["bbox"] = bbox
+    roads_path.write_text(
+        json.dumps(roads_index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    services_path = reports_dir / "services_index.json"
+    services_index = json.loads(services_path.read_text(encoding="utf-8"))
+    for family in services_index.get("families") or []:
+        relative = str(family.get("file") or "").replace("\\", "/")
+        features = features_by_file.get(relative)
+        if features is None:
+            raise RuntimeError(f"Famille de services absente après clipping : {relative}")
+        family["count"] = len(features)
+        counts = {
+            str(subcategory.get("key") or ""): 0
+            for subcategory in family.get("subcategories") or []
+        }
+        for feature in features:
+            subcategory = str((feature.get("properties") or {}).get("subcategory") or "")
+            if subcategory in counts:
+                counts[subcategory] += 1
+        for subcategory in family.get("subcategories") or []:
+            subcategory["count"] = counts[str(subcategory.get("key") or "")]
+    services_index["generatedAt"] = generated_at
+    services_index["bbox"] = bbox
+    services_path.write_text(
+        json.dumps(services_index, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    layers_by_name = {
+        str(layer.get("name") or ""): layer
+        for layer in layer_index.get("layers") or []
+    }
+    zone_names = (
+        "residential", "commercial", "industrial", "retail",
+        "parking", "office", "mixed",
+    )
+    source_layer_names = (
+        *zone_names,
+        "roads", "paths", "railways", "water_lines_clipped", "water_areas_clipped",
+    )
+    service_total = sum(int(family.get("count") or 0) for family in services_index.get("families") or [])
+    overlay_total = sum(int(layers_by_name[name]["count"]) for name in source_layer_names)
+
+    unique_elements = set()
+    source_files = [
+        str(layers_by_name[name]["file"]).replace("\\", "/")
+        for name in source_layer_names
+    ] + [
+        str(family.get("file") or "").replace("\\", "/")
+        for family in services_index.get("families") or []
+    ]
+    for relative in source_files:
+        for feature in features_by_file.get(relative, []):
+            properties = feature.get("properties") or {}
+            element_id = properties.get("id")
+            element_type = properties.get("osmType") or properties.get("type")
+            if element_id is not None and element_type:
+                unique_elements.add((str(element_type), int(element_id)))
+
+    report_path = reports_dir / "extraction_report.json"
+    extraction_report = json.loads(report_path.read_text(encoding="utf-8"))
+    summary = extraction_report.setdefault("summary", {})
+    summary.update({
+        "total": overlay_total,
+        "overlayFeaturesWithoutServices": overlay_total,
+        "legacyAllFeaturesCount": int(layers_by_name["all_features"]["count"]),
+        "independentRailwayFeatureCount": int(layers_by_name["railways"]["count"]),
+        "independentServiceFeatureCount": service_total,
+        "allBundleFeatureCount": overlay_total + service_total,
+        "uniqueOsmElementCount": len(unique_elements),
+        "counts": {
+            name if name not in {"water_lines_clipped", "water_areas_clipped"}
+            else name.replace("_clipped", ""): int(layers_by_name[name]["count"])
+            for name in source_layer_names
+        },
+        "serviceCounts": {
+            str(family.get("key")): int(family.get("count") or 0)
+            for family in services_index.get("families") or []
+        },
+        "clipDerived": True,
+    })
+    extraction_report["generatedAt"] = generated_at
+    extraction_report["bbox"] = bbox
+    extraction_report["outputDirectory"] = str(out_pack)
+    extraction_report["layers"] = layer_index["layers"]
+    report_path.write_text(
+        json.dumps(extraction_report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pack", required=True)
@@ -107,8 +230,13 @@ def main():
     parser.add_argument("--bbox", default=None, help="south,west,north,east. Default: read reports/extraction_report.json")
     args = parser.parse_args()
 
-    src_pack = Path(args.pack)
-    out_pack = Path(args.out)
+    src_pack = Path(args.pack).resolve()
+    out_pack = Path(args.out).resolve()
+
+    if src_pack == out_pack or src_pack in out_pack.parents or out_pack in src_pack.parents:
+        raise SystemExit("[ERREUR] --pack et --out doivent être deux dossiers distincts et non imbriqués.")
+    if out_pack == Path(out_pack.anchor):
+        raise SystemExit("[ERREUR] Refus d'écrire ou supprimer une racine de volume.")
 
     bbox_str = args.bbox or read_declared_bbox(src_pack)
     south, west, north, east = parse_bbox(bbox_str)
@@ -123,8 +251,9 @@ def main():
     if (src_pack / "reports").exists():
         shutil.copytree(src_pack / "reports", out_pack / "reports", dirs_exist_ok=True)
 
+    generated_at = datetime.now(timezone.utc).isoformat()
     report = {
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": generated_at,
         "sourcePack": str(src_pack),
         "outputPack": str(out_pack),
         "bbox": bbox_str,
@@ -132,7 +261,10 @@ def main():
         "files": [],
     }
 
-    for in_path in sorted((src_pack / "geojson").glob("*.geojson")):
+    feature_counts: dict[str, int] = {}
+    features_by_file: dict[str, list] = {}
+
+    for in_path in sorted((src_pack / "geojson").rglob("*.geojson")):
         data = json.loads(in_path.read_text(encoding="utf-8-sig"))
         before = stats(data, south, west, north, east)
 
@@ -140,21 +272,27 @@ def main():
         for feature in data.get("features", []):
             clipped_features.extend(clip_feature(feature, clip_box))
 
+        # Conserve les foreign members GeoJSON documentant le périmètre de
+        # all_features.geojson (scope/includes/excludesIndependentSources).
         out_data = {
-            "type": "FeatureCollection",
-            "features": clipped_features,
+            key: copy.deepcopy(value)
+            for key, value in data.items()
+            if key not in {"type", "features"}
         }
+        out_data.update({"type": "FeatureCollection", "features": clipped_features})
 
         after = stats(out_data, south, west, north, east)
 
-        out_path = out_pack / "geojson" / in_path.name
+        relative = in_path.relative_to(src_pack).as_posix()
+        out_path = out_pack / Path(relative)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(
             json.dumps(out_data, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
 
         item = {
-            "file": f"geojson/{in_path.name}",
+            "file": relative,
             "featuresBefore": len(data.get("features", [])),
             "featuresAfter": len(clipped_features),
             "coordsBefore": before["coords"],
@@ -163,11 +301,21 @@ def main():
             "outsideAfter": after["outside"],
         }
         report["files"].append(item)
+        feature_counts[relative] = len(clipped_features)
+        features_by_file[relative] = clipped_features
 
         print(
-            f"{in_path.name}: outside {before['outside']} -> {after['outside']} "
+            f"{relative}: outside {before['outside']} -> {after['outside']} "
             f"| features {item['featuresBefore']} -> {item['featuresAfter']}"
         )
+
+    update_pack_reports(
+        out_pack,
+        bbox=bbox_str,
+        generated_at=generated_at,
+        feature_counts=feature_counts,
+        features_by_file=features_by_file,
+    )
 
     (out_pack / "reports" / "true_clip_report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2),

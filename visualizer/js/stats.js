@@ -18,9 +18,15 @@
     var mixed = sourceCount(dataset, "mixed");
     var roads = sourceCount(dataset, "roads");
     var paths = sourceCount(dataset, "paths");
+    var water = dataset.bundleTotals ? dataset.bundleTotals.water : 0;
+    var railways = dataset.bundleTotals ? dataset.bundleTotals.railways : 0;
+    var services = dataset.bundleTotals ? dataset.bundleTotals.services : 0;
+    var visualEntities = Number.isFinite(dataset.totalVisualEntities)
+      ? dataset.totalVisualEntities
+      : dataset.totalRaw;
 
     return {
-      total: dataset.totalRaw,
+      total: visualEntities,
       residential: residential,
       commercial: commercial,
       industrial: industrial,
@@ -29,8 +35,11 @@
       mixed: mixed,
       roads: roads,
       paths: paths,
+      water: water,
+      railways: railways,
+      services: services,
       cards: [
-        { key: "total", label: "Objets", value: dataset.totalRaw },
+        { key: "total", label: "Entités visuelles", value: visualEntities },
         { key: "residential", label: "Résidentiel", value: residential },
         { key: "commercial", label: "Commercial", value: commercial },
         { key: "industrial", label: "Industrie", value: industrial },
@@ -38,7 +47,10 @@
         { key: "office", label: "Bureaux", value: office },
         { key: "mixed", label: "Usage mixte", value: mixed },
         { key: "roads", label: "Routes", value: roads },
-        { key: "paths", label: "Chemins", value: paths }
+        { key: "paths", label: "Chemins", value: paths },
+        { key: "water", label: "Hydrographie", value: water },
+        { key: "railways", label: "Voies ferrées", value: railways },
+        { key: "services", label: "Services", value: services }
       ]
     };
   }

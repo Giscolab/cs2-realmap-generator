@@ -3,20 +3,6 @@
 
   var DEFAULT_PACK_INDEX_PATH = "../exports/bundles/irvine_ca_us_33.653495_-117.723999/geojson_pack/reports/layer_index.json";
 
-  var SOURCE_KEYS = {
-    residential: true,
-    commercial: true,
-    retail: true,
-    industrial: true,
-    parking: true,
-    office: true,
-    mixed: true,
-    roads: true,
-    paths: true,
-    water_lines_clipped: true,
-    water_areas_clipped: true
-  };
-
   function fetchJSON(path) {
     return fetch(path, { cache: "no-store" }).then(function (response) {
       if (!response.ok) {
@@ -153,13 +139,26 @@
     });
   }
 
+  function selectSourceLayers(index, config) {
+    var sourceKeys = (config.dataSources || []).reduce(function (keys, source) {
+      if (source && source.key) {
+        keys[source.key] = true;
+      }
+      return keys;
+    }, {});
+
+    // Le count peut valoir zéro : la présence du fichier dans l'index suffit
+    // pour que la source soit chargée et déclarée disponible.
+    return (index.layers || []).filter(function (layer) {
+      return layer && sourceKeys[layer.name] && layer.file;
+    });
+  }
+
   function loadDefaultPack(config) {
     var indexPath = config.packIndexPath || DEFAULT_PACK_INDEX_PATH;
 
     return fetchJSON(indexPath).then(function (index) {
-      var sourceLayers = (index.layers || []).filter(function (layer) {
-        return layer && SOURCE_KEYS[layer.name] && layer.file;
-      });
+      var sourceLayers = selectSourceLayers(index, config);
 
       return Promise.all(sourceLayers.map(function (layer) {
         var layerPath = resolveLayerPath(indexPath, layer.file);
@@ -184,10 +183,10 @@
         var roadsIndexPath = packRoot + "reports/roads_index.json";
 
         return Promise.all([
-          fetchJSON(servicesIndexPath).catch(function () {
+          fetchJSON(servicesIndexPath).then(null, function () {
             return null;
           }),
-          fetchJSON(roadsIndexPath).catch(function () {
+          fetchJSON(roadsIndexPath).then(null, function () {
             return null;
           })
         ]).then(function (indexes) {
@@ -205,6 +204,8 @@
   }
 
   App.PackLoader = {
-    loadDefaultPack: loadDefaultPack
+    loadDefaultPack: loadDefaultPack,
+    selectSourceLayers: selectSourceLayers,
+    convertFeatureCollection: convertFeatureCollection
   };
 })(window.CS2Zoning = window.CS2Zoning || {});

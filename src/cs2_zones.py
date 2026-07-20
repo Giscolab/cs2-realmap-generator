@@ -48,7 +48,10 @@ def build_queries(bbox: str) -> dict:
     return {
         "buildings_levels": f"""
 [out:json][timeout:120];
-way["building"="apartments"]["building:levels"]({bbox});
+(
+  way["building"]["building:levels"]({bbox});
+  relation["building"]["building:levels"]({bbox});
+);
 out ids tags;
 """.strip(),
 
@@ -57,6 +60,8 @@ out ids tags;
 (
   way["landuse"="residential"]({bbox});
   relation["landuse"="residential"]({bbox});
+  way["building"~"^(apartments|residential|house|detached|semidetached_house|terrace|townhouse|dormitory|bungalow|static_caravan)$"]({bbox});
+  relation["building"~"^(apartments|residential|house|detached|semidetached_house|terrace|townhouse|dormitory|bungalow|static_caravan)$"]({bbox});
 );
 out geom;
 """.strip(),
@@ -68,8 +73,10 @@ out geom;
   relation["landuse"="commercial"]({bbox});
   way["building"~"^(commercial|retail|mall)$"]({bbox});
   relation["building"~"^(commercial|retail|mall)$"]({bbox});
-  way["shop"~"^(mall|department_store)$"]({bbox});
-  relation["shop"~"^(mall|department_store)$"]({bbox});
+  way["shop"]({bbox});
+  relation["shop"]({bbox});
+  way["amenity"="marketplace"]({bbox});
+  relation["amenity"="marketplace"]({bbox});
 );
 out geom;
 """.strip(),
@@ -80,6 +87,9 @@ out geom;
   way["landuse"="industrial"]({bbox});
   relation["landuse"="industrial"]({bbox});
   way["building"~"^(industrial|warehouse|factory)$"]({bbox});
+  relation["building"~"^(industrial|warehouse|factory)$"]({bbox});
+  way["industrial"]({bbox});
+  relation["industrial"]({bbox});
 );
 out geom;
 """.strip(),
@@ -125,6 +135,10 @@ out geom;
   relation["mixed_use"="yes"]({bbox});
   way["building:use"~"(apartments|residential)"]["building:use"~"(commercial|office|retail|shop)"]({bbox});
   relation["building:use"~"(apartments|residential)"]["building:use"~"(commercial|office|retail|shop)"]({bbox});
+  way["building"~"^(apartments|residential|house|terrace|townhouse)$"]["shop"]({bbox});
+  relation["building"~"^(apartments|residential|house|terrace|townhouse)$"]["shop"]({bbox});
+  way["building"~"^(apartments|residential|house|terrace|townhouse)$"]["office"]({bbox});
+  relation["building"~"^(apartments|residential|house|terrace|townhouse)$"]["office"]({bbox});
 );
 out geom;
 """.strip(),

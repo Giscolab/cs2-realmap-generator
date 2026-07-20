@@ -76,6 +76,8 @@ def test_complete_bundle_check_includes_railways_and_services() -> None:
 
     assert railways_path.endswith("\\geojson\\railways.geojson")
     assert railways_path in referenced
+    assert manifest["geojson"]["allFeatures"] in referenced
+    assert manifest["geojson"]["roads"] in referenced
     assert manifest["geojson"]["servicesIndex"] in referenced
     assert set(manifest["geojson"]["services"].values()).issubset(referenced)
 

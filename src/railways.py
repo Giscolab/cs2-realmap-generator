@@ -133,6 +133,7 @@ def railway_item(element: dict) -> dict | None:
 
     return {
         "id": element.get("id"),
+        "osmType": element.get("type"),
         **railway_properties(tags),
         "coords": coords,
     }

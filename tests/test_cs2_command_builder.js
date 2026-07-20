@@ -26,11 +26,13 @@ assert.ok(command.indexOf('Assert-PythonSuccess "Extraction GeoJSON"') >= 0);
 assert.ok(command.indexOf('Assert-PythonSuccess "Génération des PNG"') >= 0);
 assert.ok(command.indexOf('Assert-PythonSuccess "Écriture du manifeste"') >= 0);
 assert.ok(command.indexOf('Assert-PythonSuccess "Validation des PNG"') >= 0);
-assert.ok(command.indexOf('$railwaysGeoJson = Join-Path $geoDir "geojson\\railways.geojson"') >= 0);
-assert.ok(command.indexOf("Test-Path -LiteralPath $railwaysGeoJson -PathType Leaf") >= 0);
-assert.ok(command.indexOf("$timelineBundle = Join-Path $timelineBundles $bundleId") >= 0);
-assert.ok(command.indexOf("Get-ChildItem -LiteralPath $bundle -Force | Copy-Item -Destination $timelineBundle -Recurse -Force") >= 0);
-assert.ok(command.indexOf('Copy-Item $bundle "$timelineBundles\\$bundleId" -Recurse -Force') < 0);
+assert.ok(command.indexOf('python" ".\\tools\\validate_cs2_bundle.py"') >= 0);
+assert.ok(command.indexOf('Assert-PythonSuccess "Validation intégrale du bundle"') >= 0);
+assert.ok(command.indexOf('python" ".\\tools\\sync_citytimeline_bundle.py"') >= 0);
+assert.ok(command.indexOf('Assert-PythonSuccess "Synchronisation atomique vers CityTimelineMod"') >= 0);
+assert.ok(command.indexOf("  --target-root $timelineBundles `") >= 0);
+assert.ok(command.indexOf("Copy-Item") < 0);
+assert.ok(command.indexOf("bundle_index.json") < command.indexOf("sync_citytimeline_bundle.py"));
 assert.ok(command.endsWith("tree $bundle /F"));
 
 console.log("CS2 full bundle command tests: OK");

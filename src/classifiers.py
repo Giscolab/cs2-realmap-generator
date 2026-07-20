@@ -33,7 +33,7 @@ def parse_levels(value, default: int = 0) -> int:
         return default
 
 
-def classify_residential(tags: dict, building_levels_index: dict, element_id: int) -> str:
+def classify_residential(tags: dict, building_levels_index: dict, element_id: object) -> str:
     """
     Classe une zone résidentielle en haute, moyenne ou basse densité.
 
@@ -52,7 +52,7 @@ def classify_residential(tags: dict, building_levels_index: dict, element_id: in
     if (
         effective_levels >= 5
         or residential_subtype in ("apartments", "apartment", "condominium", "condo")
-        or building_type in ("apartments", "residential")
+        or building_type == "apartments"
     ):
         return "high"
 
@@ -166,6 +166,13 @@ def classify_road(tags: dict) -> dict:
             "confidence": "direct",
         }
 
+    if highway == "track":
+        return {
+            "subcategory": "Track",
+            "sourceTag": "highway=track",
+            "confidence": "direct",
+        }
+
     if highway in (
         "primary",
         "secondary",
@@ -173,6 +180,7 @@ def classify_road(tags: dict) -> dict:
         "residential",
         "living_street",
         "unclassified",
+        "road",
     ):
         return {
             "subcategory": "Road",
@@ -218,6 +226,34 @@ def classify_path(tags: dict) -> dict:
         return {
             "subcategory": "Path",
             "sourceTag": "highway=path",
+            "confidence": "direct",
+        }
+
+    if highway == "cycleway":
+        return {
+            "subcategory": "Cycleway",
+            "sourceTag": "highway=cycleway",
+            "confidence": "direct",
+        }
+
+    if highway == "bridleway":
+        return {
+            "subcategory": "Bridleway",
+            "sourceTag": "highway=bridleway",
+            "confidence": "direct",
+        }
+
+    if highway == "corridor":
+        return {
+            "subcategory": "Corridor",
+            "sourceTag": "highway=corridor",
+            "confidence": "direct",
+        }
+
+    if highway == "platform":
+        return {
+            "subcategory": "Platform",
+            "sourceTag": "highway=platform",
             "confidence": "direct",
         }
 

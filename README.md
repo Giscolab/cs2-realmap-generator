@@ -46,6 +46,24 @@ Le projet sert à générer des bundles contenant notamment :
 
 Le projet ne fournit pas un zonage administratif officiel. Il produit une interprétation technique, vérifiable et exploitable des données OpenStreetMap disponibles.
 
+### Contrat du bundle complet
+
+Un pack généré contient 31 sources GeoJSON validées : 7 couches de zonage,
+leurs agrégats, les routes et leurs 6 classes, les chemins, l'eau linéaire et
+surfacique, le ferroviaire autonome, puis les 9 familles de services. Les
+fichiers `layer_index.json`, `roads_index.json` et `services_index.json`
+référencent chaque source et leurs comptes sont contrôlés contre le nombre réel
+de features. Une couche légitimement vide reste présente avec un compte à zéro.
+
+`all_features.geojson` conserve son nom historique, mais son périmètre est
+explicitement `legacy-base-overlays` : il exclut `railways.geojson` et les
+services afin de ne jamais dupliquer leurs géométries. Le total intégral et le
+nombre d'objets OSM uniques sont publiés dans `extraction_report.json`.
+
+Toutes les données sont exclusivement visuelles et informatives. Aucun fichier
+du générateur ne contient d'instruction d'import, de prefab, de spawner ou de
+modification d'un réseau du jeu.
+
 ### Calque ferroviaire V1
 
 `exports/bundles/<bundle_id>/geojson_pack/geojson/railways.geojson` est l’unique source des voies `rail`, `narrow_gauge`, `tram`, `light_rail` et `subway` actives. Les voies de service `yard`, `siding`, `spur` et `crossover` restent dans ce même fichier ; `light_rail` conserve une catégorie distincte du tramway. Ce GeoJSON fournit exclusivement un plan visuel projeté sur le terrain : aucun import, prefab, spawner ou changement du réseau du jeu n’est généré.
@@ -69,11 +87,8 @@ uv sync
 cd ..
 ```
 
-Sans `uv` :
-
-```powershell
-python -m pip install requests tqdm
-```
+Sans `uv`, l'extraction GeoJSON utilise uniquement la bibliothèque standard de
+Python et ne nécessite aucun paquet supplémentaire.
 
 Pour les outils PNG et de clipping :
 
@@ -112,7 +127,7 @@ http://localhost:8000/visualizer/
 
 - La qualité dépend directement des tags OpenStreetMap.
 - `building:levels` est souvent incomplet ; la densité résidentielle peut rester basse par défaut.
-- Overpass peut être lent ou échouer sur de grandes emprises. Le pipeline réduit le risque avec des requêtes séparées et une rotation de serveurs, sans le supprimer.
+- Overpass peut être lent sur de grandes emprises. Chaque réponse réussie est reprise depuis `exports/.overpass-cache/<bundle_id>` lors d'une relance ; après l'échec de tous les serveurs, la bbox est automatiquement découpée et les résultats sont fusionnés sans doublons OSM.
 - Les exports Terrain RGB nécessitent un fournisseur externe, une clé API et une connexion réseau.
 - Les services sont extraits en points (centroïdes) : pas d'emprises surfaciques ni de réseaux (égouts, canalisations) dans le pipeline courant.
 - Le projet prépare des ressources et contrats ; l'intégration finale côté jeu ou mod reste une étape séparée.

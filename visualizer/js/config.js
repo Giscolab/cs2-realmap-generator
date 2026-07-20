@@ -246,7 +246,7 @@
         category: "paths",
         geometry: "line",
         label: "Chemins/piéton",
-        description: "Footways, paths, steps et rues piétonnes",
+        description: "Voies piétonnes, chemins, marches, pistes cyclables, cavalières, corridors et quais",
         color: "#2ad4ff",
         stroke: "#2ad4ff",
         lineWeight: 1,
