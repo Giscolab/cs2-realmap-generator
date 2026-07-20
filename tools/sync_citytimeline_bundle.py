@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 from validate_cs2_bundle import BundleValidationError, validate_bundle_directory
@@ -120,6 +121,35 @@ def _json_bytes(data: dict) -> bytes:
     return (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
+@contextmanager
+def _exclusive_sync_lock(target_root: Path):
+    """Empêche deux publications de partager le même staging/backup.
+
+    La création d'un dossier est atomique sur les systèmes de fichiers pris en
+    charge. Un arrêt brutal peut laisser le verrou en place : dans ce cas le
+    message indique volontairement son chemin au lieu de deviner qu'il est
+    obsolète et de risquer d'écraser une publication encore active.
+    """
+    lock_dir = target_root / ".citytimeline-bundle-sync.lock"
+    try:
+        lock_dir.mkdir()
+    except FileExistsError as exc:
+        raise BundleValidationError(
+            "Une synchronisation CityTimelineMod est déjà en cours "
+            f"(verrou : {lock_dir})."
+        ) from exc
+
+    try:
+        (lock_dir / "owner.json").write_text(
+            json.dumps({"pid": os.getpid()}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        yield
+    finally:
+        if lock_dir.exists():
+            shutil.rmtree(lock_dir)
+
+
 def _is_game_running() -> bool:
     if os.name != "nt":
         return False
@@ -222,7 +252,7 @@ def _coherent_target_index(
     }
 
 
-def sync_active_bundle(
+def _sync_active_bundle_unlocked(
     source_root: Path,
     target_root: Path,
     *,
@@ -347,6 +377,37 @@ def sync_active_bundle(
         "geojsonFileCount": deployed_report["geojsonFileCount"],
         "layerCount": deployed_report["layerCount"],
     }
+
+
+def sync_active_bundle(
+    source_root: Path,
+    target_root: Path,
+    *,
+    bundle_id: str | None = None,
+    allow_running_game: bool = False,
+    game_running: bool | None = None,
+) -> dict:
+    source_root = Path(source_root).resolve()
+    target_root = Path(target_root).resolve()
+    if source_root == target_root:
+        raise BundleValidationError("Les racines source et destination doivent être distinctes")
+
+    running = _is_game_running() if game_running is None else game_running
+    if running and not allow_running_game:
+        raise BundleValidationError(
+            "Cities2.exe est en cours d'exécution. Fermez le jeu avant la publication "
+            "(ou utilisez explicitement --allow-running-game à vos risques)."
+        )
+
+    target_root.mkdir(parents=True, exist_ok=True)
+    with _exclusive_sync_lock(target_root):
+        return _sync_active_bundle_unlocked(
+            source_root,
+            target_root,
+            bundle_id=bundle_id,
+            allow_running_game=True,
+            game_running=False,
+        )
 
 
 def main() -> int:

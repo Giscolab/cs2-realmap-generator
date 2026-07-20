@@ -269,3 +269,24 @@ def test_sync_refuses_running_game_without_explicit_override(tmp_path: Path) -> 
         )
 
     assert not target_root.exists()
+
+
+def test_sync_refuses_a_concurrent_publication_lock(tmp_path: Path) -> None:
+    _, source_index = make_complete_bundle(tmp_path / "source")
+    target_root = tmp_path / "timeline" / "bundles"
+    lock_dir = target_root / ".citytimeline-bundle-sync.lock"
+    lock_dir.mkdir(parents=True)
+    (lock_dir / "owner.json").write_text('{"pid":1234}\n', encoding="utf-8")
+
+    with pytest.raises(BundleValidationError, match="déjà en cours"):
+        sync_active_bundle(
+            source_index.parent,
+            target_root,
+            game_running=False,
+        )
+
+    assert lock_dir.is_dir()
+    assert not any(
+        path.is_dir() and not path.name.startswith(".")
+        for path in target_root.iterdir()
+    )
