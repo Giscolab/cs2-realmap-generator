@@ -596,17 +596,39 @@ def write_bundle_index(repo_root: Path, manifest: dict) -> Path:
             "bundles": [],
         }
 
-    bundles = data.get("bundles")
-    if not isinstance(bundles, list):
+    if not isinstance(data.get("bundles"), list):
         raise SystemExit(f"[ERREUR] Champ bundles invalide dans : {index_path}")
 
     entry = build_bundle_index_entry(manifest)
+    bundle_root = index_path.parent
+    by_id: dict[str, dict] = {}
+    if bundle_root.exists():
+        for bundle_dir in sorted(bundle_root.iterdir(), key=lambda path: path.name):
+            if not bundle_dir.is_dir() or bundle_dir.name.startswith("."):
+                continue
+            manifest_path = bundle_dir / "manifest.json"
+            if not manifest_path.is_file():
+                continue
+            try:
+                disk_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                disk_entry = build_bundle_index_entry(disk_manifest)
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+                raise SystemExit(
+                    f"[ERREUR] Manifest de bundle invalide : {manifest_path} ({exc})"
+                ) from exc
+            if disk_entry["id"] != bundle_dir.name:
+                raise SystemExit(
+                    "[ERREUR] L'identifiant du manifest ne correspond pas à son dossier : "
+                    f"{manifest_path} ({disk_entry['id']!r} != {bundle_dir.name!r})"
+                )
+            if disk_entry["id"] in by_id:
+                raise SystemExit(
+                    f"[ERREUR] Identifiant de bundle dupliqué : {disk_entry['id']}"
+                )
+            by_id[disk_entry["id"]] = disk_entry
 
-    by_id = {
-        str(item.get("id")): item
-        for item in bundles
-        if isinstance(item, dict) and item.get("id") is not None
-    }
+    # Le manifeste courant vient d'être écrit avant cet appel. Cette affectation
+    # garde toutefois la fonction déterministe pour ses usages unitaires.
     by_id[entry["id"]] = entry
 
     data["schemaVersion"] = 1

@@ -20,6 +20,7 @@ from service_families import SERVICE_FAMILIES  # noqa: E402
 from sync_citytimeline_bundle import sync_active_bundle  # noqa: E402
 from validate_cs2_bundle import BundleValidationError, validate_bundle_directory  # noqa: E402
 from write_cs2_bundle_manifest import (  # noqa: E402
+    build_bundle_index_entry,
     build_manifest,
     write_bundle_index,
     write_json,
@@ -194,6 +195,21 @@ def test_active_bundle_id_must_match_validated_bundle(tmp_path: Path) -> None:
             bundle_index_path=index_path,
             require_active=True,
         )
+
+
+def test_bundle_index_is_rebuilt_from_every_manifest_on_disk(tmp_path: Path) -> None:
+    bundle_dir, index_path = make_complete_bundle(tmp_path)
+    data = json.loads(index_path.read_text(encoding="utf-8"))
+    data["bundles"][0]["recommendedWaterLevel"] = -999
+    data["bundles"].append({"id": "orphan_without_manifest"})
+    index_path.write_text(json.dumps(data), encoding="utf-8")
+
+    manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    write_bundle_index(tmp_path, manifest)
+
+    rebuilt = json.loads(index_path.read_text(encoding="utf-8"))
+    assert rebuilt["activeBundleId"] == bundle_dir.name
+    assert rebuilt["bundles"] == [build_bundle_index_entry(manifest)]
 
 
 def test_sync_publishes_coherent_active_index_after_complete_bundle(tmp_path: Path) -> None:
