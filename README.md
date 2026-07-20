@@ -213,7 +213,10 @@ http://localhost:8000/visualizer/
 - Overpass peut être lent sur de grandes emprises. Chaque réponse réussie est reprise depuis `exports/.overpass-cache/<bundle_id>` lors d'une relance ; après l'échec de tous les serveurs, la bbox est automatiquement découpée et les résultats sont fusionnés sans doublons OSM.
 - Les exports Terrain RGB nécessitent un fournisseur externe, une clé API et une connexion réseau.
 - Les services sont extraits en points (centroïdes) : pas d'emprises surfaciques ni de réseaux (égouts, canalisations) dans le pipeline courant.
-- Le projet prépare des ressources et contrats ; l'intégration finale côté jeu ou mod reste une étape séparée.
+- La synchronisation publie directement le bundle validé dans CityTimelineMod ;
+  le jeu doit seulement être relancé pour charger la nouvelle copie. Les
+  GeoJSON restent des calques visuels/informatifs : aucun prefab, spawner,
+  import ou changement du réseau du jeu n'est exécuté.
 
 ---
 
