@@ -181,16 +181,14 @@ def test_negative_bbox_values_are_accepted_as_separate_windows_arguments() -> No
     assert config.no_sync is True
 
 
-@pytest.mark.parametrize(
-    "changes, message",
-    [
+def test_invalid_contract_is_rejected_before_execution() -> None:
+    cases = [
         ({"bbox": "-35,149,-36,150"}, "mal ordonnée"),
         ({"center_lon": 12.0}, "centre"),
         ({"valid_min_elev": 100, "valid_max_elev": 100}, "valid-min-elev"),
         ({"bundle_id": "nom/interdit"}, "bundle-id"),
         ({"no_overpass_cache": True, "refresh_overpass_cache": True}, "incompatibles"),
-    ],
-)
-def test_invalid_contract_is_rejected_before_execution(changes, message) -> None:
-    with pytest.raises(PipelineError, match=message):
-        build_pipeline(_config(**changes))
+    ]
+    for changes, message in cases:
+        with pytest.raises(PipelineError, match=message):
+            build_pipeline(_config(**changes))

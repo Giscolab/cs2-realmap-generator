@@ -108,6 +108,89 @@ Ou avec Mapbox :
 $env:MAPBOX_TOKEN = "votre-token"
 ```
 
+## Une commande pour le bundle complet
+
+`tools/build_complete_bundle.py` remplace la suite de commandes PowerShell
+manuelles. Il exécute, dans cet ordre : extraction GeoJSON scindée, export des
+deux PNG, manifeste et configuration Timeline, validation PNG, validation
+exhaustive du bundle, puis synchronisation atomique vers CityTimelineMod.
+
+Chaque sous-outil est lancé avec le même `sys.executable`, via `subprocess` sans
+shell. La clé MapTiler reste dans l'environnement et n'apparaît jamais dans la
+ligne de commande. La publication finale est refusée si `Cities2.exe` est ouvert,
+sauf demande explicite avec `--allow-running-game`.
+
+### Canberra
+
+```powershell
+$env:MAPTILER_API_KEY = "votre-cle"
+
+python .\tools\build_complete_bundle.py `
+  --city "Canberra" `
+  --country "Australia" `
+  --country-code "au" `
+  --bundle-id "canberra_au_-35.281000_149.128000" `
+  --bbox "-35.539433,148.812836,-35.022567,149.443164" `
+  --heightmap-bbox "-35.345608,149.049209,-35.216392,149.206791" `
+  --center-lon "149.128" `
+  --center-lat "-35.281" `
+  --worldmap-size-km "57.344" `
+  --heightmap-size-km "14.336" `
+  --pixels "4096" `
+  --provider "maptiler" `
+  --zoom "14" `
+  --heightmap-normalization "nonta-manual" `
+  --cs2-base-level "1" `
+  --below-sea-reserve-meters "511.7" `
+  --cs2-elevation-scale "4096" `
+  --cs2-vertical-scale "1" `
+  --valid-min-elev "-200" `
+  --valid-max-elev "5000"
+```
+
+### Pretoria
+
+```powershell
+$env:MAPTILER_API_KEY = "votre-cle"
+
+python .\tools\build_complete_bundle.py `
+  --city "Pretoria" `
+  --country "Afrique du Sud" `
+  --country-code "za" `
+  --bundle-id "pretoria_za_-25.746000_28.188000" `
+  --bbox "-26.004810,27.902229,-25.487190,28.473771" `
+  --heightmap-bbox "-25.810702,28.116557,-25.681298,28.259443" `
+  --center-lon "28.188" `
+  --center-lat "-25.746" `
+  --worldmap-size-km "57.344" `
+  --heightmap-size-km "14.336" `
+  --pixels "4096" `
+  --provider "maptiler" `
+  --zoom "14" `
+  --heightmap-normalization "nonta-manual" `
+  --cs2-base-level "1" `
+  --below-sea-reserve-meters "511.7" `
+  --cs2-elevation-scale "4096" `
+  --cs2-vertical-scale "1" `
+  --valid-min-elev "-200" `
+  --valid-max-elev "5000"
+```
+
+Le cache de reprise Overpass est actif par défaut dans
+`exports/.overpass-cache/<bundle_id>`. Les options utiles sont :
+
+- `--overpass-cache-dir <dossier>` pour choisir un autre cache ;
+- `--refresh-overpass-cache` pour remplacer les réponses en cache ;
+- `--no-overpass-cache` pour désactiver la reprise ;
+- `--target-root <dossier>` pour choisir la destination CityTimelineMod ;
+- `--no-sync` pour construire et valider sans publier ;
+- `--prompt-terrain-token` pour saisir la clé masquée si la variable
+  d'environnement est absente ;
+- `--dry-run` pour afficher toutes les étapes sans fichier ni réseau.
+
+La synchronisation est la dernière étape. Un échec d'extraction, d'export ou de
+validation arrête immédiatement le pipeline et ne publie pas un index partiel.
+
 
 ## Ouvrir le visualiseur
 
