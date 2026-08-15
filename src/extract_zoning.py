@@ -574,10 +574,14 @@ def build_features(items: list, geometry_type: str) -> list:
 
 def write_geojson(path: Path, features: list, metadata: dict | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(feature_collection(features, metadata), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(
+            feature_collection(features, metadata),
+            handle,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
 
 
 def road_highway_value(item: dict) -> str:
